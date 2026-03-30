@@ -398,13 +398,13 @@ textarea.inp{resize:vertical;min-height:80px;line-height:1.5}
       <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/></svg>
       <span>Payer</span>
     </button>
-    <button class="tab" onclick="tab('history',this)">
-      <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>
-      <span>Historique</span>
-    </button>
     <button class="tab" onclick="tab('decode',this)">
       <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 4a1 1 0 011-1h3a1 1 0 010 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h3a1 1 0 010 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h3a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h3a1 1 0 110 2H4a1 1 0 01-1-1zM8 4a1 1 0 000 2h8a1 1 0 100-2H8zm0 4a1 1 0 000 2h8a1 1 0 100-2H8zm0 4a1 1 0 000 2h8a1 1 0 100-2H8zm0 4a1 1 0 000 2h8a1 1 0 100-2H8z" clip-rule="evenodd"/></svg>
       <span>Décoder</span>
+    </button>
+    <button class="tab" onclick="tab('history',this)">
+      <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>
+      <span>Historique</span>
     </button>
     <button class="tab" onclick="tab('stats',this)">
       <svg viewBox="0 0 20 20" fill="currentColor"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>
@@ -439,6 +439,29 @@ textarea.inp{resize:vertical;min-height:80px;line-height:1.5}
         <span class="chip" onclick="quickOffer(100000,'100K sats')">⚡ 100K sats</span>
         <span class="chip" onclick="quickOffer(1000000,'1M sats')">⚡ 1M sats</span>
         <span class="chip" onclick="quickOffer(0,'Donation libre')">🎁 Donation libre</span>
+      </div>
+      <!-- Options avancées -->
+      <div style="margin-bottom:16px">
+        <button type="button" onclick="toggleAdvanced()" style="display:flex;align-items:center;gap:6px;background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;padding:0;font-family:inherit" id="adv-toggle">
+          <svg id="adv-arrow" viewBox="0 0 20 20" fill="currentColor" style="width:12px;height:12px;transition:transform .2s"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+          Options avancées (émetteur, expiry, quantité)
+        </button>
+        <div id="adv-fields" style="display:none;margin-top:12px">
+          <div class="row2" style="margin-bottom:12px">
+            <div>
+              <label>Émetteur <span style="color:var(--muted);font-weight:400;font-size:9px;text-transform:none">optionnel</span></label>
+              <input class="inp" type="text" id="o-issuer" placeholder="ex: Plebians_fr">
+            </div>
+            <div>
+              <label>Quantité max <span style="color:var(--muted);font-weight:400;font-size:9px;text-transform:none">optionnel</span></label>
+              <input class="inp" type="number" id="o-quantity" placeholder="ex: 10 billets" min="1">
+            </div>
+          </div>
+          <div class="row1" style="margin-bottom:0">
+            <label>Expiry (timestamp Unix) <span style="color:var(--muted);font-weight:400;font-size:9px;text-transform:none">optionnel — laisser vide = pas d'expiration</span></label>
+            <input class="inp" type="number" id="o-expiry" placeholder="ex: 1735689600 (timestamp Unix)">
+          </div>
+        </div>
       </div>
       <div class="btn-row">
         <button class="btn btn-p" id="create-btn" onclick="createOffer()">
@@ -497,37 +520,122 @@ textarea.inp{resize:vertical;min-height:80px;line-height:1.5}
 
   <!-- ── TAB: PAY ── -->
   <div class="panel" id="p-pay">
-    <div class="card">
-      <div class="card-head">
-        <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/></svg>
-        Payer une offer BOLT12
-      </div>
-      <div class="pay-warning">
-        <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
-        Le paiement peut prendre jusqu'à 90s (BOLT12 nécessite un échange onion avec le node destinataire). Ne fermez pas la page.
-      </div>
-      <div class="row1">
-        <label>Offer BOLT12 <span class="req">*</span></label>
-        <input class="inp" type="text" id="pay-offer" placeholder="lno1…" style="font-family:'SF Mono','Fira Code',monospace;font-size:12px">
-      </div>
-      <div class="row2">
-        <div>
-          <label>Montant (sats) <span style="color:var(--muted);font-weight:400;text-transform:none;font-size:10px">si offer libre</span></label>
-          <input class="inp" type="number" id="pay-amount" placeholder="Laisser vide si fixe" min="1">
+
+    <!-- Mode switcher -->
+    <div style="display:flex;gap:8px;margin-bottom:16px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:4px">
+      <button id="pm-offer-btn" class="btn btn-p" onclick="switchPayMode('offer')" style="flex:1;padding:9px;font-size:13px;border-radius:8px">
+        <svg viewBox="0 0 20 20" fill="currentColor" style="width:14px;height:14px"><path fill-rule="evenodd" d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5z" clip-rule="evenodd"/></svg>
+        Via Offer <code style="font-size:10px;opacity:.7">lno1…</code>
+      </button>
+      <button id="pm-inv-btn" class="btn btn-g" onclick="switchPayMode('invoice')" style="flex:1;padding:9px;font-size:13px;border-radius:8px">
+        <svg viewBox="0 0 20 20" fill="currentColor" style="width:14px;height:14px"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/></svg>
+        Invoice directe <code style="font-size:10px;opacity:.7">lni1…</code>
+      </button>
+    </div>
+
+    <!-- MODE: Payer via Offer (lno1) -->
+    <div id="pm-offer">
+      <div class="card">
+        <div class="card-head">
+          <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/></svg>
+          Payer une offer BOLT12
         </div>
-        <div>
-          <label>Note payeur <span style="color:var(--muted);font-weight:400;text-transform:none;font-size:10px">optionnel</span></label>
-          <input class="inp" type="text" id="pay-note" placeholder="Message pour le destinataire">
+        <div class="pay-warning">
+          <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+          Peut prendre jusqu'à 90s — BOLT12 négocie une invoice via onion messaging avant de payer.
+        </div>
+        <div class="row1">
+          <label>Offer BOLT12 <span class="req">*</span></label>
+          <input class="inp" type="text" id="pay-offer" placeholder="lno1…" style="font-family:'SF Mono','Fira Code',monospace;font-size:12px">
+        </div>
+        <div class="row2">
+          <div>
+            <label>Montant (sats) <span style="color:var(--muted);font-weight:400;text-transform:none;font-size:10px">si offer libre</span></label>
+            <input class="inp" type="number" id="pay-amount" placeholder="Vide si montant fixe" min="1">
+          </div>
+          <div>
+            <label>Note payeur <span style="color:var(--muted);font-weight:400;text-transform:none;font-size:10px">optionnel</span></label>
+            <input class="inp" type="text" id="pay-note" placeholder="Message pour le destinataire">
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-g" id="preview-btn" onclick="previewOffer()" style="font-size:13px;padding:10px 16px">
+            <svg viewBox="0 0 20 20" fill="currentColor" style="width:14px;height:14px"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/></svg>
+            Prévisualiser
+          </button>
+          <button class="btn btn-cyan" id="pay-btn" onclick="payOffer()">
+            <svg viewBox="0 0 20 20" fill="currentColor" style="width:15px;height:15px"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/></svg>
+            Payer directement
+          </button>
+          <button class="btn btn-g" onclick="clearPayOffer()" style="font-size:13px;padding:10px 14px">✕</button>
         </div>
       </div>
-      <div class="btn-row">
-        <button class="btn btn-cyan" id="pay-btn" onclick="payOffer()">
-          <svg viewBox="0 0 20 20" fill="currentColor" style="width:15px;height:15px"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/></svg>
-          Envoyer le paiement
-        </button>
-        <button class="btn btn-g" onclick="document.getElementById('pay-offer').value='';document.getElementById('pay-amount').value='';document.getElementById('pay-note').value=''" style="font-size:13px;padding:10px 14px">Effacer</button>
+
+      <!-- Preview card (offer → invoice) -->
+      <div id="offer-preview" style="display:none">
+        <div class="card" style="border-color:rgba(34,211,238,.25)">
+          <div class="card-head" style="color:var(--cyan)">
+            <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/></svg>
+            Aperçu avant paiement
+          </div>
+          <div id="preview-amount" style="margin-bottom:14px"></div>
+          <div class="decode-grid" id="preview-grid"></div>
+          <div class="btn-row" style="margin-top:18px">
+            <button class="btn btn-cyan" id="confirm-pay-btn" onclick="payFromPreview()">
+              <svg viewBox="0 0 20 20" fill="currentColor" style="width:15px;height:15px"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+              Confirmer et payer
+            </button>
+            <button class="btn btn-g" onclick="document.getElementById('offer-preview').style.display='none'" style="font-size:13px;padding:10px 14px">Annuler</button>
+          </div>
+        </div>
       </div>
     </div>
+
+    <!-- MODE: Payer une invoice directe (lni1) -->
+    <div id="pm-invoice" style="display:none">
+      <div class="card">
+        <div class="card-head" style="color:var(--pL)">
+          <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/></svg>
+          Payer une invoice BOLT12 directe
+        </div>
+        <div style="padding:10px 14px;border-radius:10px;background:rgba(139,92,246,.06);border:1px solid rgba(139,92,246,.2);font-size:12px;color:rgba(196,181,253,.8);margin-bottom:16px;line-height:1.6">
+          Utilise <strong>PayInvoice</strong> — pour payer une invoice <code style="background:rgba(0,0,0,.3);padding:1px 5px;border-radius:4px">lni1…</code> reçue directement, sans passer par une offer.
+        </div>
+        <div class="row1">
+          <label>Invoice BOLT12 <span class="req">*</span></label>
+          <textarea class="inp" id="pinv-invoice" placeholder="lni1…" rows="3" style="font-family:'SF Mono','Fira Code',monospace;font-size:11px;line-height:1.5"></textarea>
+        </div>
+        <div class="row1">
+          <label>Montant (sats) <span style="color:var(--muted);font-weight:400;text-transform:none;font-size:10px">si variable</span></label>
+          <input class="inp" type="number" id="pinv-amount" placeholder="Laisser vide si fixé dans l'invoice" min="1">
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-g" id="pinv-preview-btn" onclick="previewInvoice()" style="font-size:13px;padding:10px 16px">
+            <svg viewBox="0 0 20 20" fill="currentColor" style="width:14px;height:14px"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/></svg>
+            Décoder
+          </button>
+          <button class="btn btn-p" id="pinv-pay-btn" onclick="payInvoiceDirect()">
+            <svg viewBox="0 0 20 20" fill="currentColor" style="width:15px;height:15px"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/></svg>
+            Payer l'invoice
+          </button>
+          <button class="btn btn-g" onclick="document.getElementById('pinv-invoice').value='';document.getElementById('pinv-amount').value='';document.getElementById('pinv-decoded').style.display='none'" style="font-size:13px;padding:10px 14px">✕</button>
+        </div>
+      </div>
+
+      <!-- Invoice decode preview -->
+      <div id="pinv-decoded" style="display:none">
+        <div class="card" style="border-color:rgba(139,92,246,.28)">
+          <div class="card-head">
+            <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+            Détails de l'invoice
+          </div>
+          <div id="pinv-amount-big" style="margin-bottom:14px"></div>
+          <div class="decode-grid" id="pinv-grid"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Success -->
     <div class="pay-success" id="pay-success">
       <div class="big-check">⚡</div>
       <p>Paiement confirmé !</p>
@@ -567,6 +675,11 @@ textarea.inp{resize:vertical;min-height:80px;line-height:1.5}
         <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 4a1 1 0 011-1h3a1 1 0 010 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h3a1 1 0 010 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h3a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h3a1 1 0 110 2H4a1 1 0 01-1-1zM8 4a1 1 0 000 2h8a1 1 0 100-2H8zm0 4a1 1 0 000 2h8a1 1 0 100-2H8zm0 4a1 1 0 000 2h8a1 1 0 100-2H8zm0 4a1 1 0 000 2h8a1 1 0 100-2H8z" clip-rule="evenodd"/></svg>
         Décoder une invoice BOLT12
       </div>
+      <div style="padding:10px 14px;border-radius:10px;background:rgba(34,211,238,.05);border:1px solid rgba(34,211,238,.18);font-size:12px;color:rgba(34,211,238,.8);margin-bottom:16px;line-height:1.6">
+        ⚡ Colle une <strong>invoice</strong> BOLT12 (<code style="background:rgba(0,0,0,.3);padding:1px 5px;border-radius:4px">lni1…</code>) — pas une offer (<code style="background:rgba(0,0,0,.3);padding:1px 5px;border-radius:4px">lno1…</code>).<br>
+        Les invoices sont générées par le node destinataire lors d'un paiement BOLT12.
+      </div>
+      <div id="dec-error" style="display:none;padding:12px 14px;border-radius:10px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.3);font-size:13px;color:#fca5a5;margin-bottom:14px"></div>
       <div class="row1">
         <label>Invoice BOLT12 <span class="req">*</span></label>
         <textarea class="inp" id="dec-inv" placeholder="lni1…" rows="3" style="font-family:'SF Mono','Fira Code',monospace;font-size:11px;line-height:1.5"></textarea>
@@ -576,9 +689,15 @@ textarea.inp{resize:vertical;min-height:80px;line-height:1.5}
           <svg viewBox="0 0 20 20" fill="currentColor" style="width:15px;height:15px"><path fill-rule="evenodd" d="M3 4a1 1 0 011-1h3a1 1 0 010 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h3a1 1 0 010 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h3a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h3a1 1 0 110 2H4a1 1 0 01-1-1zM8 4a1 1 0 000 2h8a1 1 0 100-2H8zm0 4a1 1 0 000 2h8a1 1 0 100-2H8zm0 4a1 1 0 000 2h8a1 1 0 100-2H8zm0 4a1 1 0 000 2h8a1 1 0 100-2H8z" clip-rule="evenodd"/></svg>
           Décoder
         </button>
-        <button class="btn btn-g" onclick="document.getElementById('dec-inv').value='';document.getElementById('dec-result').style.display='none'" style="font-size:13px;padding:10px 14px">Effacer</button>
+        <button class="btn btn-g" onclick="document.getElementById('dec-inv').value='';document.getElementById('dec-result').style.display='none';document.getElementById('dec-error').style.display='none';document.getElementById('dec-pay-btn').style.display='none'" style="font-size:13px;padding:10px 14px">Effacer</button>
       </div>
     </div>
+    <!-- Payer depuis le décodeur -->
+    <button class="btn btn-cyan" id="dec-pay-btn" onclick="payFromDecoder()" style="display:none;margin-bottom:12px;width:100%">
+      <svg viewBox="0 0 20 20" fill="currentColor" style="width:15px;height:15px"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/></svg>
+      Payer cette invoice
+    </button>
+
     <div id="dec-result" style="display:none">
       <div class="card" style="border-color:rgba(34,211,238,.25)">
         <div class="card-head" style="color:var(--cyan)">
@@ -830,7 +949,8 @@ function tab(id, el){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('p-'+id).classList.add('active');
   el.classList.add('active');
-  if(id==='history') loadHistory();
+  if(id==='history'){loadHistory();}
+
   if(id==='stats') loadStats();
   if(id==='settings'){loadWebhooks();loadLogs();updateSessionInfo();}
 }
@@ -944,10 +1064,17 @@ async function createOffer(){
   const amount=parseInt(document.getElementById('o-amount').value)||0;
   const desc=document.getElementById('o-desc').value.trim();
   if(!desc){toast('Description obligatoire','err');return;}
+  const issuer=document.getElementById('o-issuer').value.trim();
+  const expiry=parseInt(document.getElementById('o-expiry').value)||0;
+  const quantity=parseInt(document.getElementById('o-quantity').value)||0;
   const btn=document.getElementById('create-btn');
   btn.disabled=true;btn.innerHTML='<div class="spin"></div> Génération…';
   try{
-    const d=await api('/offers',{method:'POST',body:JSON.stringify({amount,description:desc})});
+    const body={amount,description:desc};
+    if(issuer) body.issuer=issuer;
+    if(expiry) body.expiry=expiry;
+    if(quantity) body.quantity=quantity;
+    const d=await api('/offers',{method:'POST',body:JSON.stringify(body)});
     if(d.success){currentOffer=d.data;showOfferResult(d.data);document.getElementById('o-amount').value='';document.getElementById('o-desc').value='';loadOffers();toast('⚡ Offer créée !','ok');}
   }catch(e){toast(e.message,'err',4000);}
   finally{btn.disabled=false;btn.innerHTML='<svg viewBox="0 0 20 20" fill="currentColor" style="width:15px;height:15px"><path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/><path d="M5 5a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/></svg>Générer l\'offer';}
@@ -1065,9 +1192,19 @@ async function loadHistory(){
 
 // ── DECODE ──
 async function decodeInv(){
+  const errEl=document.getElementById('dec-error');
+  errEl.style.display='none';
   const inv=document.getElementById('dec-inv').value.trim();
-  if(!inv){toast('Invoice requise','err');return;}
-  if(!inv.startsWith('lni')){toast('Format invalide — doit commencer par lni','err');return;}
+  if(!inv){errEl.textContent='⚠ Champ vide — colle une invoice BOLT12 (lni1…)';errEl.style.display='';return;}
+  if(inv.startsWith('lno')){
+    errEl.innerHTML='⚠ Tu as collé une <strong>offer</strong> BOLT12 (<code style="background:rgba(0,0,0,.3);padding:1px 5px;border-radius:4px">lno1…</code>), pas une invoice.<br>Une invoice (<code style="background:rgba(0,0,0,.3);padding:1px 5px;border-radius:4px">lni1…</code>) est générée par le node destinataire quand tu demandes à payer son offer.';
+    errEl.style.display='';return;
+  }
+  if(inv.startsWith('lnbc')||inv.startsWith('lntb')||inv.startsWith('lnbcrt')){
+    errEl.innerHTML='⚠ C\'est une invoice <strong>BOLT11</strong>, pas BOLT12. Ce décodeur ne supporte que les invoices BOLT12 (<code style="background:rgba(0,0,0,.3);padding:1px 5px;border-radius:4px">lni1…</code>).';
+    errEl.style.display='';return;
+  }
+  if(!inv.startsWith('lni')){errEl.textContent='⚠ Format invalide — une invoice BOLT12 commence par lni1…';errEl.style.display='';return;}
   const btn=document.getElementById('dec-btn');
   btn.disabled=true;btn.innerHTML='<div class="spin"></div> Décodage…';
   document.getElementById('dec-result').style.display='none';
@@ -1087,9 +1224,144 @@ async function decodeInv(){
     ];
     document.getElementById('dec-grid').innerHTML=fields.map(f=>`<div class="decode-field"><div class="decode-label">${f.l}</div><div class="decode-val">${esc(String(f.v))}</div></div>`).join('');
     document.getElementById('dec-result').style.display='';
+    document.getElementById('dec-pay-btn').style.display='';
     toast('✅ Décodé','ok');
   }catch(e){toast(e.message,'err',5000);}
   finally{btn.disabled=false;btn.innerHTML='<svg viewBox="0 0 20 20" fill="currentColor" style="width:15px;height:15px"><path fill-rule="evenodd" d="M3 4a1 1 0 011-1h3a1 1 0 010 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h3a1 1 0 010 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h3a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h3a1 1 0 110 2H4a1 1 0 01-1-1zM8 4a1 1 0 000 2h8a1 1 0 100-2H8zm0 4a1 1 0 000 2h8a1 1 0 100-2H8zm0 4a1 1 0 000 2h8a1 1 0 100-2H8zm0 4a1 1 0 000 2h8a1 1 0 100-2H8z" clip-rule="evenodd"/></svg>Décoder';}
+}
+
+// ── ADVANCED OFFER TOGGLE ──
+function toggleAdvanced(){
+  const f=document.getElementById('adv-fields'),arrow=document.getElementById('adv-arrow');
+  const open=f.style.display==='none';
+  f.style.display=open?'':'none';
+  arrow.style.transform=open?'rotate(90deg)':'';
+}
+
+// ── PAY MODE SWITCH ──
+function switchPayMode(mode){
+  const isOffer=mode==='offer';
+  document.getElementById('pm-offer').style.display=isOffer?'':'none';
+  document.getElementById('pm-invoice').style.display=isOffer?'none':'';
+  document.getElementById('pm-offer-btn').className='btn '+(isOffer?'btn-p':'btn-g');
+  document.getElementById('pm-inv-btn').className='btn '+(isOffer?'btn-g':'btn-p');
+  document.getElementById('pay-success').classList.remove('show');
+  document.getElementById('offer-preview').style.display='none';
+  document.getElementById('pinv-decoded').style.display='none';
+}
+
+function clearPayOffer(){
+  ['pay-offer','pay-amount','pay-note'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('offer-preview').style.display='none';
+  document.getElementById('pay-success').classList.remove('show');
+}
+
+// ── PREVIEW OFFER (GetInvoice) ──
+let _previewInvoice = '';
+async function previewOffer(){
+  const offer=document.getElementById('pay-offer').value.trim();
+  const amount=parseInt(document.getElementById('pay-amount').value)||0;
+  const note=document.getElementById('pay-note').value.trim();
+  if(!offer){toast('Offer requise','err');return;}
+  if(!offer.startsWith('lno')){toast('Format invalide — doit commencer par lno','err');return;}
+  const btn=document.getElementById('preview-btn');
+  btn.disabled=true;btn.innerHTML='<div class="spin"></div> Récupération…';
+  document.getElementById('offer-preview').style.display='none';
+  try{
+    const body={offer};if(amount>0)body.amount=amount;if(note)body.payer_note=note;
+    const d=await api('/offers/invoice',{method:'POST',body:JSON.stringify(body)});
+    _previewInvoice=d.data.invoice||'';
+    const c=d.data.contents||{};
+    const sats=Math.floor(parseInt(c.amount_msats||0)/1000);
+    document.getElementById('preview-amount').innerHTML=`<div style="font-size:30px;font-weight:800;color:var(--cyan);text-shadow:0 0 24px rgba(34,211,238,.3)">${fmt(sats)} <span style="font-size:15px;color:var(--muted)">sats</span></div><div style="font-size:12px;color:var(--muted);margin-top:4px">${(c.amount_msats||0).toLocaleString()} msats</div>`;
+    const fields=[
+      {l:'Description',v:c.description||'—'},
+      {l:'Réseau',v:c.chain||'—'},
+      {l:'Expire dans',v:c.relative_expiry?`${Math.floor(c.relative_expiry/3600)}h ${Math.floor((c.relative_expiry%3600)/60)}m`:'—'},
+      {l:'Chemins blindés',v:c.payment_paths?c.payment_paths.length:0},
+      {l:'Note payeur',v:c.payer_note||'—'},
+      {l:'Features',v:c.features?c.features.length+' bits':'—'},
+    ];
+    document.getElementById('preview-grid').innerHTML=fields.map(f=>`<div class="decode-field"><div class="decode-label">${f.l}</div><div class="decode-val">${esc(String(f.v))}</div></div>`).join('');
+    document.getElementById('offer-preview').style.display='';
+    toast('✅ Invoice récupérée','ok');
+  }catch(e){toast(e.message,'err',5000);}
+  finally{btn.disabled=false;btn.innerHTML='<svg viewBox="0 0 20 20" fill="currentColor" style="width:14px;height:14px"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/></svg>Prévisualiser';}
+}
+
+async function payFromPreview(){
+  if(!_previewInvoice){toast('Pas d\'invoice en mémoire','err');return;}
+  const btn=document.getElementById('confirm-pay-btn');
+  btn.disabled=true;btn.innerHTML='<div class="spin"></div> Paiement… (30-90s)';
+  try{
+    const d=await api('/pay/invoice',{method:'POST',body:JSON.stringify({invoice:_previewInvoice})});
+    if(d.success){
+      document.getElementById('pay-preimage').textContent=d.data.preimage||'—';
+      document.getElementById('pay-success').classList.add('show');
+      document.getElementById('offer-preview').style.display='none';
+      _previewInvoice='';
+      toast('⚡ Paiement confirmé !','ok',4000);
+      loadBalance();
+    }
+  }catch(e){toast(e.message,'err',6000);}
+  finally{btn.disabled=false;btn.innerHTML='<svg viewBox="0 0 20 20" fill="currentColor" style="width:15px;height:15px"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>Confirmer et payer';}
+}
+
+// ── PAY INVOICE DIRECT (PayInvoice) ──
+async function previewInvoice(){
+  const inv=document.getElementById('pinv-invoice').value.trim();
+  if(!inv||!inv.startsWith('lni')){toast('Invoice BOLT12 requise (lni1…)','err');return;}
+  const btn=document.getElementById('pinv-preview-btn');
+  btn.disabled=true;btn.innerHTML='<div class="spin"></div>';
+  document.getElementById('pinv-decoded').style.display='none';
+  try{
+    const d=await api('/decode',{method:'POST',body:JSON.stringify({invoice:inv})});
+    const r=d.data;
+    const sats=Math.floor(parseInt(r.amount_msats||0)/1000);
+    document.getElementById('pinv-amount-big').innerHTML=`<div style="font-size:28px;font-weight:800;color:var(--gold);text-shadow:0 0 20px rgba(245,158,11,.3)">${fmt(sats)} <span style="font-size:14px;color:var(--muted)">sats</span></div>`;
+    const fields=[
+      {l:'Description',v:r.description||'—'},
+      {l:'Réseau',v:r.chain||'—'},
+      {l:'Créée le',v:r.created_at?new Date(r.created_at*1000).toLocaleString('fr-FR'):'—'},
+      {l:'Expire dans',v:r.relative_expiry?`${Math.floor(r.relative_expiry/3600)}h ${Math.floor((r.relative_expiry%3600)/60)}m`:'—'},
+    ];
+    document.getElementById('pinv-grid').innerHTML=fields.map(f=>`<div class="decode-field"><div class="decode-label">${f.l}</div><div class="decode-val">${esc(String(f.v))}</div></div>`).join('');
+    document.getElementById('pinv-decoded').style.display='';
+    toast('✅ Décodé','ok');
+  }catch(e){toast(e.message,'err',5000);}
+  finally{btn.disabled=false;btn.innerHTML='<svg viewBox="0 0 20 20" fill="currentColor" style="width:14px;height:14px"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/></svg>Décoder';}
+}
+
+async function payInvoiceDirect(){
+  const inv=document.getElementById('pinv-invoice').value.trim();
+  const amount=parseInt(document.getElementById('pinv-amount').value)||0;
+  if(!inv||!inv.startsWith('lni')){toast('Invoice BOLT12 requise (lni1…)','err');return;}
+  const btn=document.getElementById('pinv-pay-btn');
+  btn.disabled=true;btn.innerHTML='<div class="spin"></div> Paiement… (30-90s)';
+  document.getElementById('pay-success').classList.remove('show');
+  try{
+    const body={invoice:inv};if(amount>0)body.amount=amount;
+    const d=await api('/pay/invoice',{method:'POST',body:JSON.stringify(body)});
+    if(d.success){
+      document.getElementById('pay-preimage').textContent=d.data.preimage||'—';
+      document.getElementById('pay-success').classList.add('show');
+      document.getElementById('pinv-invoice').value='';
+      document.getElementById('pinv-decoded').style.display='none';
+      toast('⚡ Paiement confirmé !','ok',4000);
+      loadBalance();
+    }
+  }catch(e){toast(e.message,'err',6000);}
+  finally{btn.disabled=false;btn.innerHTML='<svg viewBox="0 0 20 20" fill="currentColor" style="width:15px;height:15px"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/></svg>Payer l\'invoice';}
+}
+
+// ── PAY FROM DECODER TAB ──
+function payFromDecoder(){
+  const inv=document.getElementById('dec-inv').value.trim();
+  if(!inv) return;
+  switchPayMode('invoice');
+  tab('pay',document.querySelector('.tab:nth-child(2)'));
+  document.getElementById('pinv-invoice').value=inv;
+  toast('Invoice transférée vers Payer','ok');
 }
 
 // ── SHARE OFFER ──
