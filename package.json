@@ -1,0 +1,30 @@
+{
+  "name": "bolt12-offer-server",
+  "version": "1.1.0",
+  "description": "API REST pour générer des offers Bolt12 avec LND",
+  "main": "server.js",
+  "scripts": {
+    "setup": "node setup.js",
+    "start": "node server.js",
+    "start:v2": "node server-v2.js",
+    "dev": "nodemon server.js",
+    "test": "node test.js",
+    "verify": "node verify.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "dotenv": "^16.3.1",
+    "@grpc/grpc-js": "^1.9.0",
+    "@grpc/proto-loader": "^0.7.8",
+    "express-rate-limit": "^7.1.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "keywords": ["lightning", "bitcoin", "bolt12", "lnd", "api"],
+  "author": "Silex",
+  "license": "MIT",
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
