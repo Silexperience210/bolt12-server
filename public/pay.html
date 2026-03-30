@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Payer · BOLT12</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+:root {
+  --bg:    #050510;
+  --p:     #8b5cf6;
+  --pB:    #5b21b6;
+  --pL:    #c4b5fd;
+  --gold:  #f59e0b;
+  --goldL: #fde68a;
+  --green: #10b981;
+  --red:   #f87171;
+  --cyan:  #22d3ee;
+  --text:  #f0f0ff;
+  --muted: #6b6b8a;
+  --border:rgba(139,92,246,0.18);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 16px 48px}
+
+#bg{position:fixed;inset:0;z-index:0;pointer-events:none}
+.amb{position:fixed;z-index:0;pointer-events:none;border-radius:50%;filter:blur(90px);animation:amb 14s ease-in-out infinite}
+.a1{width:600px;height:400px;top:-120px;left:-120px;background:radial-gradient(ellipse,rgba(139,92,246,0.16),transparent 70%);animation-delay:0s}
+.a2{width:440px;height:300px;bottom:5%;right:-80px;background:radial-gradient(ellipse,rgba(245,158,11,0.09),transparent 70%);animation-delay:-7s}
+.a3{width:300px;height:300px;top:45%;left:45%;background:radial-gradient(ellipse,rgba(34,211,238,0.07),transparent 70%);animation-delay:-3.5s}
+@keyframes amb{0%,100%{opacity:1;transform:translate(0,0) scale(1)}33%{opacity:.7;transform:translate(40px,-25px) scale(1.06)}66%{opacity:.9;transform:translate(-25px,35px) scale(.94)}}
+
+.page{position:relative;z-index:1;width:100%;max-width:480px}
+
+@keyframes up{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+.up{animation:up .55s cubic-bezier(.22,1,.36,1) both}
+
+/* Logo */
+.logo-wrap{display:flex;align-items:center;justify-content:center;gap:13px;margin-bottom:28px}
+.logo-icon{position:relative;width:48px;height:48px;border-radius:13px;background:linear-gradient(145deg,#1e0a4e,#0d0628);border:1px solid rgba(139,92,246,0.4);display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 1px rgba(139,92,246,.1),0 0 32px rgba(139,92,246,.22),inset 0 1px 0 rgba(255,255,255,.06)}
+.logo-icon::before{content:'';position:absolute;inset:-1px;border-radius:14px;background:conic-gradient(from 0deg,var(--p),var(--gold),var(--cyan),var(--p));z-index:-1;animation:spin 5s linear infinite;opacity:.55}
+@keyframes spin{to{transform:rotate(360deg)}}
+.logo-icon svg{width:26px;height:26px}
+.logo-name{font-size:18px;font-weight:800;letter-spacing:-.4px;background:linear-gradient(90deg,#e0d7ff,var(--pL));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.logo-sub{font-size:11px;color:var(--muted);margin-top:1px}
+
+/* Card */
+.card{position:relative;border-radius:22px;padding:30px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);backdrop-filter:blur(14px);overflow:hidden}
+.card::before{content:'';position:absolute;inset:0;border-radius:22px;background:radial-gradient(ellipse 60% 40% at 50% 0%,rgba(139,92,246,.07),transparent 60%);pointer-events:none}
+
+/* Top accent line */
+.card-accent{position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--p),var(--gold),var(--cyan),var(--p));background-size:200%;animation:sh 2.5s linear infinite}
+@keyframes sh{to{background-position:-200% 0}}
+
+/* Skeleton */
+.skel{border-radius:8px;background:linear-gradient(90deg,rgba(255,255,255,.03) 25%,rgba(255,255,255,.07) 50%,rgba(255,255,255,.03) 75%);background-size:200% 100%;animation:sk 1.4s infinite}
+@keyframes sk{to{background-position:-200% 0}}
+.skel-h1{height:28px;width:60%;margin:0 auto 12px}
+.skel-h2{height:18px;width:40%;margin:0 auto 20px}
+.skel-qr{width:180px;height:180px;margin:0 auto 20px;border-radius:12px}
+.skel-blob{height:44px;border-radius:8px;margin-bottom:12px}
+.skel-btn{height:44px;border-radius:11px}
+
+/* Amount badge */
+.amount-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 16px;border-radius:22px;font-size:20px;font-weight:800;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);color:var(--goldL);text-shadow:0 0 20px rgba(245,158,11,.35);margin-bottom:16px}
+.amount-badge svg{width:18px;height:18px}
+.amount-free{color:var(--pL);background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.3);text-shadow:0 0 20px rgba(139,92,246,.35)}
+
+/* Offer description */
+.offer-title{font-size:22px;font-weight:800;text-align:center;margin-bottom:8px;line-height:1.2}
+.offer-sub{font-size:13px;color:var(--muted);text-align:center;margin-bottom:20px}
+
+/* QR */
+.qr-wrap{background:#fff;padding:10px;border-radius:14px;display:inline-flex;box-shadow:0 0 0 1px rgba(139,92,246,.2),0 8px 36px rgba(139,92,246,.2);animation:qrg 3s ease-in-out infinite alternate;margin-bottom:20px}
+@keyframes qrg{from{box-shadow:0 0 0 1px rgba(139,92,246,.2),0 8px 36px rgba(139,92,246,.2)}to{box-shadow:0 0 0 1px rgba(245,158,11,.25),0 8px 36px rgba(245,158,11,.18)}}
+
+/* Centered QR area */
+.qr-area{display:flex;flex-direction:column;align-items:center;margin-bottom:8px}
+
+/* Offer string */
+.offer-blob{background:rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.06);border-radius:11px;padding:12px 14px;font-family:'SF Mono','Fira Code',monospace;font-size:11px;color:rgba(196,181,253,.7);word-break:break-all;line-height:1.6;max-height:60px;overflow:hidden;position:relative;margin-bottom:12px}
+.offer-blob::after{content:'';position:absolute;bottom:0;left:0;right:0;height:24px;background:linear-gradient(transparent,rgba(0,0,0,.4))}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:12px 20px;border-radius:11px;border:none;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;font-family:inherit;width:100%;margin-bottom:10px}
+.btn:last-child{margin-bottom:0}
+.btn-p{background:linear-gradient(135deg,var(--p),var(--pB));color:#fff;box-shadow:0 4px 18px rgba(139,92,246,.32);position:relative;overflow:hidden}
+.btn-p::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.1),transparent);opacity:0;transition:opacity .2s}
+.btn-p:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(139,92,246,.5)}
+.btn-p:hover::after{opacity:1}
+.btn-g{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:var(--muted)}
+.btn-g:hover{color:var(--text);border-color:rgba(139,92,246,.4);background:rgba(139,92,246,.08)}
+.btn-gold{background:linear-gradient(135deg,rgba(245,158,11,.15),rgba(120,53,15,.3));border:1px solid rgba(245,158,11,.3);color:var(--goldL)}
+.btn-gold:hover{box-shadow:0 4px 18px rgba(245,158,11,.2);transform:translateY(-1px)}
+.btn svg{width:16px;height:16px;flex-shrink:0}
+
+/* Divider */
+.divider{height:1px;background:linear-gradient(90deg,transparent,rgba(139,92,246,.18),transparent);margin:18px 0}
+
+/* Error card */
+.err-card{text-align:center;padding:40px 20px}
+.err-icon{width:56px;height:56px;margin:0 auto 16px;border-radius:50%;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);display:flex;align-items:center;justify-content:center}
+.err-icon svg{width:26px;height:26px;color:var(--red)}
+.err-title{font-size:18px;font-weight:700;color:var(--red);margin-bottom:8px}
+.err-sub{font-size:13px;color:var(--muted);line-height:1.5}
+
+/* Footer */
+.footer{text-align:center;font-size:11px;color:rgba(107,107,138,.45);margin-top:20px}
+.footer span{color:var(--pL);opacity:.7}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(139,92,246,.3);border-radius:3px}
+
+/* Toast */
+#toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(16px);background:rgba(12,12,28,.96);border:1px solid rgba(139,92,246,.4);color:var(--text);padding:11px 22px;border-radius:13px;font-size:13px;font-weight:500;opacity:0;pointer-events:none;transition:all .3s cubic-bezier(.22,1,.36,1);z-index:999;box-shadow:0 8px 36px rgba(0,0,0,.5);backdrop-filter:blur(12px);white-space:nowrap}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.ok{border-color:rgba(16,185,129,.4)}
+#toast.err{border-color:rgba(248,113,113,.4)}
+</style>
+</head>
+<body>
+
+<canvas id="bg"></canvas>
+<div class="amb a1"></div><div class="amb a2"></div><div class="amb a3"></div>
+
+<div class="page up">
+  <!-- Logo -->
+  <div class="logo-wrap">
+    <div class="logo-icon">
+      <svg viewBox="0 0 100 100"><defs><linearGradient id="ls" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#c4b5fd"/><stop offset="100%" style="stop-color:#8b5cf6"/></linearGradient><linearGradient id="lb" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style="stop-color:#fde68a"/><stop offset="100%" style="stop-color:#f59e0b"/></linearGradient></defs><path d="M50 8L76 20L76 48C76 64 64 76 50 82C36 76 24 64 24 48L24 20Z" fill="url(#ls)"/><polygon points="56,26 40,52 51,52 44,74 63,46 52,46 60,26" fill="url(#lb)"/></svg>
+    </div>
+    <div>
+      <div class="logo-name">BOLT12 Pay</div>
+      <div class="logo-sub">Lightning Network · Paiement instantané</div>
+    </div>
+  </div>
+
+  <!-- Main card -->
+  <div class="card" id="main-card">
+    <div class="card-accent"></div>
+
+    <!-- Loading state -->
+    <div id="state-loading">
+      <div class="skel skel-h1"></div>
+      <div class="skel skel-h2"></div>
+      <div style="display:flex;justify-content:center"><div class="skel skel-qr"></div></div>
+      <div class="skel skel-blob"></div>
+      <div class="skel skel-btn"></div>
+    </div>
+
+    <!-- Error state -->
+    <div id="state-error" style="display:none">
+      <div class="err-card">
+        <div class="err-icon">
+          <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+        </div>
+        <div class="err-title" id="err-title">Offer introuvable</div>
+        <div class="err-sub" id="err-sub">Cette offer n'existe pas ou a été désactivée.</div>
+      </div>
+    </div>
+
+    <!-- Offer content -->
+    <div id="state-offer" style="display:none;text-align:center">
+      <div class="offer-title" id="pay-desc">—</div>
+      <div class="offer-sub" id="pay-node">BOLT12 Offer</div>
+
+      <div style="margin-bottom:16px">
+        <div class="amount-badge" id="pay-amt-badge">
+          <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/></svg>
+          <span id="pay-amt-text">—</span>
+        </div>
+      </div>
+
+      <div class="qr-area">
+        <div class="qr-wrap" id="pay-qr"></div>
+      </div>
+
+      <div class="offer-blob" id="pay-blob"></div>
+
+      <button class="btn btn-g" onclick="copyOfferStr()" id="copy-btn">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"/><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"/></svg>
+        Copier l'offer
+      </button>
+
+      <div class="divider"></div>
+
+      <a class="btn btn-gold" id="wallet-btn" href="#" style="text-decoration:none">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z"/><path fill-rule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clip-rule="evenodd"/></svg>
+        Ouvrir dans le wallet
+      </a>
+
+      <button class="btn btn-p" onclick="copyOfferStr()">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/></svg>
+        Payer avec BOLT12
+      </button>
+    </div>
+  </div>
+
+  <div class="footer">Powered by BOLT12 Server · <span>silexperience210</span></div>
+</div>
+
+<div id="toast"></div>
+
+<!-- Canvas plasma hive -->
+<script>
+(function(){
+  const cv=document.getElementById('bg'),ctx=cv.getContext('2d');
+  let W,H,T=0;
+  const HEX=[],R=46;
+  const bolts=[];
+
+  function resize(){
+    W=cv.width=window.innerWidth; H=cv.height=window.innerHeight;
+    HEX.length=0;
+    const rh=R*Math.sqrt(3);
+    const cols=Math.ceil(W/(R*1.5))+3, rows=Math.ceil(H/rh)+3;
+    for(let c=-1;c<cols;c++)
+      for(let r=-1;r<rows;r++){
+        const x=c*R*1.5, y=r*rh+(c%2===0?0:rh/2);
+        HEX.push({x,y});
+      }
+  }
+
+  function plasma(x,y,t){
+    const cx=W/2,cy=H/2;
+    const v1=Math.sin(x*.014 + t*.7);
+    const v2=Math.sin(y*.014 - t*.55);
+    const v3=Math.sin((x+y)*.01  + t*1.05);
+    const v4=Math.sin(Math.sqrt((x-cx)**2+(y-cy)**2)*.016 - t*1.3);
+    const v5=Math.sin(x*.009 - y*.011 + t*.4);
+    return((v1+v2+v3+v4+v5)/5+1)/2;
+  }
+
+  function pcolor(v){
+    const a=Math.max(0,(v-.12)*1.3);
+    let r,g,b;
+    if(v<.45){
+      const k=v/.45;
+      r=20+k*119; g=5+k*87; b=40+k*206;
+    } else if(v<.72){
+      const k=(v-.45)/.27;
+      r=139+k*(34-139); g=92+k*(211-92); b=246+k*(238-246);
+    } else {
+      const k=(v-.72)/.28;
+      r=34+k*221; g=211+k*(180-211); b=238+k*(80-238);
+    }
+    return[Math.round(r),Math.round(g),Math.round(b),Math.min(1,a)];
+  }
+
+  function hexCell(x,y,v){
+    const[r,g,b,a]=pcolor(v);
+    if(a<.015) return;
+    ctx.beginPath();
+    for(let i=0;i<6;i++){
+      const ang=(Math.PI/3)*i-Math.PI/6;
+      i?ctx.lineTo(x+R*Math.cos(ang),y+R*Math.sin(ang))
+       :ctx.moveTo(x+R*Math.cos(ang),y+R*Math.sin(ang));
+    }
+    ctx.closePath();
+    ctx.lineWidth=.7+v*.9;
+    ctx.strokeStyle=`rgba(${r},${g},${b},${Math.min(.9,a*.85)})`;
+    if(v>.58){
+      const gIntensity=(v-.58)*52;
+      ctx.shadowBlur=gIntensity;
+      ctx.shadowColor=`rgba(${r},${g},${b},.9)`;
+    }
+    ctx.stroke();
+    ctx.shadowBlur=0;
+  }
+
+  const PTS=[];
+  for(let i=0;i<50;i++) PTS.push({
+    x:Math.random()*1400,y:Math.random()*900,
+    vx:(Math.random()-.5)*.28,vy:(Math.random()-.5)*.28,
+    r:Math.random()*1.3+.3,a:Math.random()*.3+.07,
+    c:['139,92,246','245,158,11','34,211,238'][Math.floor(Math.random()*3)]
+  });
+
+  function spawnBolt(){
+    const x1=Math.random()*W,y1=Math.random()*H,
+          len=70+Math.random()*200,ang=Math.random()*Math.PI*2,
+          n=5+Math.floor(Math.random()*8),p=[];
+    for(let i=0;i<=n;i++){
+      const k=i/n,jx=i>0&&i<n?(Math.random()-.5)*30:0,jy=i>0&&i<n?(Math.random()-.5)*30:0;
+      p.push({x:x1+Math.cos(ang)*len*k+jx,y:y1+Math.sin(ang)*len*k+jy});
+    }
+    return{p,life:1,d:.038+Math.random()*.04};
+  }
+  setInterval(()=>{if(Math.random()>.3)bolts.push(spawnBolt())},1300);
+
+  function draw(){
+    T+=.013;
+    ctx.clearRect(0,0,W,H);
+    HEX.forEach(h=>hexCell(h.x,h.y,plasma(h.x,h.y,T)));
+    PTS.forEach(p=>{
+      p.x+=p.vx;p.y+=p.vy;
+      if(p.x<0)p.x=W;if(p.x>W)p.x=0;if(p.y<0)p.y=H;if(p.y>H)p.y=0;
+      ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+      ctx.fillStyle=`rgba(${p.c},${p.a})`;ctx.fill();
+    });
+    for(let i=bolts.length-1;i>=0;i--){
+      const b=bolts[i];
+      ctx.beginPath();ctx.moveTo(b.p[0].x,b.p[0].y);
+      b.p.slice(1).forEach(q=>ctx.lineTo(q.x,q.y));
+      ctx.strokeStyle=`rgba(139,92,246,${b.life*.6})`;
+      ctx.lineWidth=b.life*2.2;
+      ctx.shadowBlur=16;ctx.shadowColor=`rgba(139,92,246,${b.life})`;
+      ctx.stroke();ctx.shadowBlur=0;
+      b.life-=b.d;if(b.life<=0)bolts.splice(i,1);
+    }
+    requestAnimationFrame(draw);
+  }
+
+  window.addEventListener('resize',resize);
+  resize();draw();
+})();
+</script>
+
+<script>
+let _tt;
+function toast(msg, type='', dur=2800){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className='show'+(type?' '+type:'');
+  clearTimeout(_tt); _tt=setTimeout(()=>t.className='',dur);
+}
+
+function fmt(n){return Number(n).toLocaleString('fr-FR');}
+function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+
+let _offerStr = '';
+
+function copyOfferStr(){
+  if(!_offerStr) return;
+  navigator.clipboard.writeText(_offerStr).then(()=>toast('Offer copiée !','ok'));
+}
+
+function showError(title, sub){
+  document.getElementById('state-loading').style.display='none';
+  document.getElementById('state-offer').style.display='none';
+  document.getElementById('state-error').style.display='';
+  document.getElementById('err-title').textContent=title||'Erreur';
+  document.getElementById('err-sub').textContent=sub||'Une erreur est survenue.';
+}
+
+function showOffer(o){
+  document.getElementById('state-loading').style.display='none';
+  document.getElementById('state-error').style.display='none';
+
+  // Description
+  document.getElementById('pay-desc').textContent=o.description||'Offer BOLT12';
+  document.getElementById('pay-node').textContent=o.node_alias?`Node: ${o.node_alias}`:'BOLT12 Lightning Offer';
+
+  // Amount badge
+  const badge=document.getElementById('pay-amt-badge');
+  const amtText=document.getElementById('pay-amt-text');
+  if(o.amount>0){
+    amtText.textContent=`${fmt(o.amount)} sats`;
+  } else {
+    amtText.textContent='Montant libre';
+    badge.classList.add('amount-free');
+  }
+
+  // Offer string
+  _offerStr = o.offer||'';
+  document.getElementById('pay-blob').textContent=_offerStr;
+
+  // QR code
+  const qrEl=document.getElementById('pay-qr');
+  qrEl.innerHTML='';
+  try{
+    new QRCode(qrEl,{text:_offerStr,width:200,height:200,correctLevel:QRCode.CorrectLevel.M});
+  }catch{
+    qrEl.innerHTML='<div style="width:200px;height:200px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#888">QR indisponible</div>';
+  }
+
+  // Wallet link
+  document.getElementById('wallet-btn').href=`lightning:${_offerStr}`;
+
+  document.getElementById('state-offer').style.display='';
+}
+
+async function loadOffer(){
+  const params=new URLSearchParams(window.location.search);
+  const id=params.get('id');
+  if(!id){
+    showError('Paramètre manquant','Aucun identifiant d\'offer fourni dans l\'URL.');
+    return;
+  }
+  try{
+    const r=await fetch(`/api/v1/public/offers/${encodeURIComponent(id)}`);
+    if(r.status===404){showError('Offer introuvable','Cette offer n\'existe pas ou a été désactivée.');return;}
+    if(!r.ok){showError('Erreur serveur',`HTTP ${r.status}`);return;}
+    const d=await r.json();
+    if(!d.success||!d.data){showError('Données invalides','La réponse du serveur est invalide.');return;}
+    showOffer(d.data);
+  }catch(e){
+    showError('Connexion impossible','Impossible de contacter le serveur BOLT12.');
+  }
+}
+
+loadOffer();
+</script>
+</body>
+</html>

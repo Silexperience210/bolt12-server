@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BOLT12 · Lightning Node</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 :root {
   --bg:      #050510;
@@ -240,6 +241,31 @@ textarea.inp{resize:vertical;min-height:80px;line-height:1.5}
 /* ─── SCROLLBAR ─── */
 ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(139,92,246,.3);border-radius:3px}
 .divider{height:1px;background:linear-gradient(90deg,transparent,rgba(139,92,246,.18),transparent);margin:20px 0}
+
+/* ─── STATS CHART ─── */
+.chart-wrap{position:relative;height:200px;margin-bottom:20px}
+.stats-total-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px}
+.stot{background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:14px;text-align:center}
+.stot-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:6px}
+.stot-val{font-size:20px;font-weight:800}
+@media(max-width:500px){.stats-total-grid{grid-template-columns:1fr 1fr}}
+
+/* ─── WEBHOOKS / SETTINGS ─── */
+.wh-row{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:12px;padding:13px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px}
+.wh-info{flex:1;min-width:0}
+.wh-url{font-family:'SF Mono','Fira Code',monospace;font-size:11px;color:var(--pL);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wh-events{font-size:10px;color:var(--muted);margin-top:2px}
+.log-row{background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.04);border-radius:8px;padding:9px 12px;margin-bottom:5px;display:flex;align-items:center;gap:10px;font-size:11px}
+.log-method{font-family:'SF Mono','Fira Code',monospace;color:var(--cyan);min-width:38px;font-weight:700}
+.log-path{flex:1;font-family:'SF Mono','Fira Code',monospace;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.log-status{padding:2px 7px;border-radius:5px;font-size:10px;font-weight:700}
+.log-status.ok{background:rgba(16,185,129,.15);color:#6ee7b7}
+.log-status.err{background:rgba(248,113,113,.15);color:#fca5a5}
+.log-ip{font-size:10px;color:var(--muted);white-space:nowrap}
+.log-date{font-size:10px;color:rgba(107,107,138,.6);white-space:nowrap}
+.session-info{background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:12px;padding:14px 16px;margin-bottom:16px}
+.session-info p{font-size:12px;color:var(--goldL);margin-bottom:4px}
+.session-info small{font-size:11px;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -380,6 +406,14 @@ textarea.inp{resize:vertical;min-height:80px;line-height:1.5}
       <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 4a1 1 0 011-1h3a1 1 0 010 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h3a1 1 0 010 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h3a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h3a1 1 0 110 2H4a1 1 0 01-1-1zM8 4a1 1 0 000 2h8a1 1 0 100-2H8zm0 4a1 1 0 000 2h8a1 1 0 100-2H8zm0 4a1 1 0 000 2h8a1 1 0 100-2H8zm0 4a1 1 0 000 2h8a1 1 0 100-2H8z" clip-rule="evenodd"/></svg>
       <span>Décoder</span>
     </button>
+    <button class="tab" onclick="tab('stats',this)">
+      <svg viewBox="0 0 20 20" fill="currentColor"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>
+      <span>Stats</span>
+    </button>
+    <button class="tab" onclick="tab('settings',this)">
+      <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
+      <span>Paramètres</span>
+    </button>
   </div>
 
   <!-- ── TAB: OFFERS ── -->
@@ -511,10 +545,16 @@ textarea.inp{resize:vertical;min-height:80px;line-height:1.5}
           Activité récente
           <span class="count-pill" id="hist-count">—</span>
         </div>
-        <button class="btn btn-g" onclick="loadHistory()" style="padding:7px 13px;font-size:12px;gap:5px">
-          <svg viewBox="0 0 20 20" fill="currentColor" style="width:12px;height:12px"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/></svg>
-          Refresh
-        </button>
+        <div style="display:flex;gap:7px">
+          <button class="btn btn-gold" onclick="exportCSV()" style="padding:7px 13px;font-size:12px;gap:5px">
+            <svg viewBox="0 0 20 20" fill="currentColor" style="width:12px;height:12px"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+            CSV
+          </button>
+          <button class="btn btn-g" onclick="loadHistory()" style="padding:7px 13px;font-size:12px;gap:5px">
+            <svg viewBox="0 0 20 20" fill="currentColor" style="width:12px;height:12px"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/></svg>
+            Refresh
+          </button>
+        </div>
       </div>
       <div id="history-list" style="margin-top:18px"></div>
     </div>
@@ -548,6 +588,76 @@ textarea.inp{resize:vertical;min-height:80px;line-height:1.5}
         <div id="dec-amount-big" style="margin-bottom:14px"></div>
         <div class="decode-grid" id="dec-grid"></div>
       </div>
+    </div>
+  </div>
+
+  <!-- ── TAB: STATS ── -->
+  <div class="panel" id="p-stats">
+    <div class="card">
+      <div class="card-head">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>
+        Activité 14 derniers jours
+      </div>
+      <div class="chart-wrap">
+        <canvas id="chart-canvas"></canvas>
+      </div>
+      <div class="stats-total-grid" id="stats-totals">
+        <div class="stot"><div class="stot-label">Total envoyé</div><div class="stot-val gold" id="st-sent">—</div></div>
+        <div class="stot"><div class="stot-label">Total reçu</div><div class="stot-val cyan" id="st-recv">—</div></div>
+        <div class="stot"><div class="stot-label">Transactions</div><div class="stot-val purple" id="st-count">—</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── TAB: PARAMÈTRES ── -->
+  <div class="panel" id="p-settings">
+
+    <!-- Session info -->
+    <div class="card">
+      <div class="card-head">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 8a6 6 0 01-7.743 5.743L10 14l-1 1-1 1H6v2H2v-4l4.257-4.257A6 6 0 1118 8zm-6-4a1 1 0 100 2 2 2 0 012 2 1 1 0 102 0 4 4 0 00-4-4z" clip-rule="evenodd"/></svg>
+        Session & Sécurité
+      </div>
+      <div class="session-info" id="session-info">
+        <p id="session-expiry">Session : —</p>
+        <small>La session expire 48h après la dernière connexion.</small>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-g" onclick="showAuth()" style="font-size:13px;padding:9px 14px">Voir / changer la clé API</button>
+        <button class="btn btn-red" onclick="logout()" style="font-size:13px;padding:9px 14px">Se déconnecter</button>
+      </div>
+    </div>
+
+    <!-- Webhooks -->
+    <div class="card">
+      <div class="card-head">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+        Webhooks
+      </div>
+      <!-- Add webhook form -->
+      <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+        <input class="inp" type="url" id="wh-url" placeholder="https://mon-serveur.com/hook" style="flex:2;min-width:200px">
+        <select class="inp" id="wh-event" style="flex:1;min-width:130px">
+          <option value="*">Tous les événements</option>
+          <option value="payment_sent">payment_sent</option>
+          <option value="invoice_created">invoice_created</option>
+          <option value="offer_created">offer_created</option>
+        </select>
+        <button class="btn btn-p" onclick="addWebhook()" style="padding:10px 16px;font-size:13px;white-space:nowrap">+ Ajouter</button>
+      </div>
+      <div id="wh-list"><div style="text-align:center;padding:20px;font-size:13px;color:var(--muted)">Chargement…</div></div>
+    </div>
+
+    <!-- Access logs -->
+    <div class="card">
+      <div class="list-header">
+        <div class="card-head" style="margin-bottom:0">
+          <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h3a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/></svg>
+          Access Log
+        </div>
+        <button class="btn btn-g" onclick="loadLogs()" style="padding:7px 13px;font-size:12px">Refresh</button>
+      </div>
+      <div id="log-list" style="margin-top:16px;max-height:320px;overflow-y:auto"></div>
     </div>
   </div>
 
@@ -696,6 +806,15 @@ textarea.inp{resize:vertical;min-height:80px;line-height:1.5}
 <script>
 let KEY = localStorage.getItem('b12k') || '';
 let currentOffer = null;
+const SESSION_TTL = 48 * 3600 * 1000; // 48h
+
+// Check session expiry on load
+(function checkSession(){
+  const ts = parseInt(localStorage.getItem('b12k_ts')||'0');
+  if(KEY && ts && Date.now()-ts > SESSION_TTL){
+    KEY=''; localStorage.removeItem('b12k'); localStorage.removeItem('b12k_ts');
+  }
+})();
 
 // ── TOAST ──
 let _tt;
@@ -712,6 +831,8 @@ function tab(id, el){
   document.getElementById('p-'+id).classList.add('active');
   el.classList.add('active');
   if(id==='history') loadHistory();
+  if(id==='stats') loadStats();
+  if(id==='settings'){loadWebhooks();loadLogs();updateSessionInfo();}
 }
 
 // ── AUTH ──
@@ -750,7 +871,11 @@ function copyKey(){
 function saveKey(){
   const k=document.getElementById('key-inp').value.trim();
   if(!k){document.getElementById('auth-err').textContent='Clé requise';document.getElementById('auth-err').style.display='';return;}
-  KEY=k; localStorage.setItem('b12k',k); hideAuth(); init();
+  KEY=k; localStorage.setItem('b12k',k); localStorage.setItem('b12k_ts',Date.now()); hideAuth(); init();
+}
+function logout(){
+  KEY=''; localStorage.removeItem('b12k'); localStorage.removeItem('b12k_ts');
+  toast('Déconnecté','ok'); showAuth();
 }
 document.getElementById('auth-ov').addEventListener('click',e=>{
   if(e.target===document.getElementById('auth-ov')&&KEY) hideAuth();
@@ -804,7 +929,7 @@ async function init(){
   if(!KEY){
     try{
       const r=await fetch('/api/v1/config');
-      if(r.ok){const c=await r.json();if(c.apiKey){KEY=c.apiKey;localStorage.setItem('b12k',KEY);}}
+      if(r.ok){const c=await r.json();if(c.apiKey){KEY=c.apiKey;localStorage.setItem('b12k',KEY);localStorage.setItem('b12k_ts',Date.now());}}
     }catch{}
   }
   if(!KEY){showAuth();return;}
@@ -860,6 +985,10 @@ async function loadOffers(){
           <button class="btn btn-g" style="padding:5px 11px;font-size:11px;gap:4px" onclick="copyStr('${esc(o.offer||'')}')">
             <svg viewBox="0 0 20 20" fill="currentColor" style="width:11px;height:11px"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"/><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"/></svg>
             Copier
+          </button>
+          <button class="btn btn-cyan" style="padding:5px 11px;font-size:11px;gap:4px" onclick="shareOffer('${esc(o.id||'')}')">
+            <svg viewBox="0 0 20 20" fill="currentColor" style="width:11px;height:11px"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z"/></svg>
+            Partager
           </button>
           <button class="btn btn-red" style="padding:5px 11px;font-size:11px" onclick="delOffer('${esc(o.id||'')}')">Suppr.</button>
         </div>
@@ -961,6 +1090,128 @@ async function decodeInv(){
     toast('✅ Décodé','ok');
   }catch(e){toast(e.message,'err',5000);}
   finally{btn.disabled=false;btn.innerHTML='<svg viewBox="0 0 20 20" fill="currentColor" style="width:15px;height:15px"><path fill-rule="evenodd" d="M3 4a1 1 0 011-1h3a1 1 0 010 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h3a1 1 0 010 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h3a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h3a1 1 0 110 2H4a1 1 0 01-1-1zM8 4a1 1 0 000 2h8a1 1 0 100-2H8zm0 4a1 1 0 000 2h8a1 1 0 100-2H8zm0 4a1 1 0 000 2h8a1 1 0 100-2H8zm0 4a1 1 0 000 2h8a1 1 0 100-2H8z" clip-rule="evenodd"/></svg>Décoder';}
+}
+
+// ── SHARE OFFER ──
+function shareOffer(id){
+  const url=window.location.origin+'/pay/'+id;
+  navigator.clipboard.writeText(url).then(()=>toast('🔗 Lien copié : '+url,'ok',4000));
+}
+
+// ── CSV EXPORT ──
+async function exportCSV(){
+  if(!KEY) return;
+  try{
+    const r=await fetch('/api/v1/payments/export',{headers:{'x-api-key':KEY}});
+    if(!r.ok) throw new Error(`HTTP ${r.status}`);
+    const blob=await r.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download='bolt12-history.csv'; a.click();
+    URL.revokeObjectURL(url);
+    toast('📥 Export CSV téléchargé','ok');
+  }catch(e){toast(e.message,'err');}
+}
+
+// ── STATS ──
+let _chart = null;
+async function loadStats(){
+  if(!KEY) return;
+  try{
+    const {data:d}=await api('/stats');
+    const days=d.days||[];
+    const labels=days.map(x=>x.date);
+    const sentData=days.map(x=>x.sent_sats);
+    const recvData=days.map(x=>x.received_sats);
+
+    const ctx2=document.getElementById('chart-canvas').getContext('2d');
+    if(_chart) _chart.destroy();
+    _chart=new Chart(ctx2,{
+      type:'bar',
+      data:{
+        labels,
+        datasets:[
+          {label:'Envoyé (sats)',data:sentData,backgroundColor:'rgba(248,113,113,.55)',borderColor:'rgba(248,113,113,.8)',borderWidth:1,borderRadius:4},
+          {label:'Reçu (sats)',data:recvData,backgroundColor:'rgba(16,185,129,.45)',borderColor:'rgba(16,185,129,.7)',borderWidth:1,borderRadius:4}
+        ]
+      },
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{labels:{color:'rgba(240,240,255,.6)',font:{size:11}}},tooltip:{callbacks:{label:ctx=>` ${ctx.dataset.label}: ${Number(ctx.parsed.y).toLocaleString('fr-FR')} sats`}}},
+        scales:{
+          x:{ticks:{color:'rgba(107,107,138,.7)',font:{size:10}},grid:{color:'rgba(255,255,255,.03)'}},
+          y:{ticks:{color:'rgba(107,107,138,.7)',font:{size:10},callback:v=>v>=1000?(v/1000)+'k':v},grid:{color:'rgba(255,255,255,.05)'}}
+        }
+      }
+    });
+
+    const tot=d.totals||{};
+    document.getElementById('st-sent').innerHTML=`${fmt(tot.sent_sats||0)} <span style="font-size:12px;font-weight:500;color:var(--muted)">sats</span>`;
+    document.getElementById('st-recv').innerHTML=`${fmt(tot.received_sats||0)} <span style="font-size:12px;font-weight:500;color:var(--muted)">sats</span>`;
+    document.getElementById('st-count').textContent=tot.count||0;
+  }catch(e){console.warn('stats:',e.message);}
+}
+
+// ── WEBHOOKS ──
+async function loadWebhooks(){
+  if(!KEY) return;
+  const list=document.getElementById('wh-list');
+  try{
+    const {data:whs}=await api('/webhooks');
+    if(!whs||!whs.length){list.innerHTML=`<div style="text-align:center;padding:20px;font-size:13px;color:var(--muted)">Aucun webhook configuré</div>`;return;}
+    list.innerHTML=whs.map(w=>`
+      <div class="wh-row">
+        <div class="wh-info">
+          <div class="wh-url">${esc(w.url)}</div>
+          <div class="wh-events">Événement : <strong style="color:var(--pL)">${esc(w.event||'*')}</strong></div>
+        </div>
+        <button class="btn btn-red" style="padding:5px 11px;font-size:11px;white-space:nowrap" onclick="delWebhook('${esc(w.id||'')}')">Suppr.</button>
+      </div>`).join('');
+  }catch(e){list.innerHTML=`<div style="text-align:center;padding:20px;font-size:13px;color:var(--red)">${esc(e.message)}</div>`;}
+}
+async function addWebhook(){
+  const url=document.getElementById('wh-url').value.trim();
+  const event=document.getElementById('wh-event').value;
+  if(!url){toast('URL requise','err');return;}
+  try{
+    await api('/webhooks',{method:'POST',body:JSON.stringify({url,event})});
+    document.getElementById('wh-url').value='';
+    toast('✅ Webhook ajouté','ok');
+    loadWebhooks();
+  }catch(e){toast(e.message,'err');}
+}
+async function delWebhook(id){
+  try{await api(`/webhooks/${id}`,{method:'DELETE'});toast('🗑 Webhook supprimé');loadWebhooks();}
+  catch(e){toast(e.message,'err');}
+}
+
+// ── ACCESS LOGS ──
+async function loadLogs(){
+  if(!KEY) return;
+  const list=document.getElementById('log-list');
+  try{
+    const {data:logs}=await api('/logs');
+    if(!logs||!logs.length){list.innerHTML=`<div style="text-align:center;padding:20px;font-size:13px;color:var(--muted)">Aucun log</div>`;return;}
+    list.innerHTML=[...logs].reverse().slice(0,80).map(l=>{
+      const ok=l.status<400;
+      return`<div class="log-row">
+        <span class="log-method">${esc(l.method||'GET')}</span>
+        <span class="log-path">${esc(l.path||'/')}</span>
+        <span class="log-status ${ok?'ok':'err'}">${l.status||'?'}</span>
+        <span class="log-ip">${esc(l.ip||'')}</span>
+        <span class="log-date">${l.ts?new Date(l.ts).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):''}</span>
+      </div>`;
+    }).join('');
+  }catch(e){list.innerHTML=`<div style="text-align:center;padding:20px;font-size:13px;color:var(--red)">${esc(e.message)}</div>`;}
+}
+
+// ── SESSION INFO ──
+function updateSessionInfo(){
+  const ts=parseInt(localStorage.getItem('b12k_ts')||'0');
+  const el=document.getElementById('session-expiry');
+  if(!ts){el.textContent='Session : non datée';return;}
+  const expiry=new Date(ts+SESSION_TTL);
+  el.textContent=`Session expire le : ${expiry.toLocaleString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}`;
 }
 
 // ── HELPERS ──
