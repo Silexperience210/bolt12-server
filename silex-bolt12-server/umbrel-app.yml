@@ -15,6 +15,7 @@ developer: silexperience210
 website: https://github.com/Silexperience210/bolt12-server
 dependencies:
   - lightning
+  - lndk
 repo: https://github.com/Silexperience210/bolt12-server
 support: https://github.com/Silexperience210/bolt12-server/issues
 port: 3001
