@@ -26,6 +26,11 @@ const apiLimiter = rateLimit({
   max: 30,
 });
 
+const readLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 60,
+});
+
 app.use(limiter);
 app.use(express.json());
 app.use(express.static('public'));
@@ -74,7 +79,7 @@ function saveOffers(offers) {
 }
 
 // ============================================
-// LND REST CLIENT (health check)
+// LND REST CLIENT
 // ============================================
 const lndTlsCert  = fs.readFileSync(LND_TLS_PATH);
 const lndMacaroon = fs.readFileSync(LND_MACAROON_PATH).toString('hex');
@@ -88,7 +93,7 @@ function lndRestGet(endpoint) {
       path: endpoint,
       method: 'GET',
       ca: lndTlsCert,
-      servername: 'localhost',  // TLS SNI override (cert has localhost)
+      servername: 'localhost',
       headers: { 'Grpc-Metadata-macaroon': lndMacaroon },
     }, res => {
       let data = '';
@@ -156,10 +161,20 @@ function fireWebhooks(event, data) {
       const u = new URL(wh.url);
       const body = JSON.stringify({ event, data, ts: new Date().toISOString() });
       const mod = u.protocol === 'https:' ? require('https') : http;
-      const r = mod.request({ hostname: u.hostname, port: u.port || (u.protocol === 'https:' ? 443 : 80), path: u.pathname + u.search, method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } });
-      r.on('error', () => {});
+      const r = mod.request({
+        hostname: u.hostname,
+        port: u.port || (u.protocol === 'https:' ? 443 : 80),
+        path: u.pathname + u.search,
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+      });
+      r.on('error', (err) => {
+        console.warn(`[webhook] Failed [${event}] → ${wh.url}: ${err.message}`);
+      });
       r.write(body); r.end();
-    } catch {}
+    } catch (err) {
+      console.warn(`[webhook] Error [${event}] → ${wh.url}: ${err.message}`);
+    }
   });
 }
 
@@ -188,17 +203,6 @@ function initLndkClient() {
 
     const lndkrpc = grpc.loadPackageDefinition(pkgDef).lndkrpc;
 
-    // LNDK macaroon (créé par LNDK au démarrage)
-    let lndkMeta = null;
-    if (fs.existsSync(LNDK_MACAROON_PATH)) {
-      const mac = fs.readFileSync(LNDK_MACAROON_PATH).toString('hex');
-      lndkMeta = () => {
-        const m = new grpc.Metadata();
-        m.add('macaroon', mac);
-        return m;
-      };
-    }
-
     const macaroonCreds = grpc.credentials.createFromMetadataGenerator((args, cb) => {
       const m = new grpc.Metadata();
       if (fs.existsSync(LNDK_MACAROON_PATH)) {
@@ -207,7 +211,6 @@ function initLndkClient() {
       cb(null, m);
     });
 
-    // LNDK génère son propre cert TLS dans /lndk-data
     const LNDK_TLS = process.env.LNDK_TLS_PATH || '/lndk-data/tls.cert';
     let creds;
     if (fs.existsSync(LNDK_TLS)) {
@@ -234,7 +237,7 @@ function initLndkClient() {
 // ============================================
 function auth(req, res, next) {
   if (req.headers['x-api-key'] !== API_KEY)
-    return res.status(401).json({ error: 'Unauthorized' });
+    return res.status(401).json({ success: false, error: 'Unauthorized' });
   next();
 }
 
@@ -263,9 +266,9 @@ app.get('/health', async (req, res) => {
 // Config (réseau local seulement)
 app.get('/api/v1/config', (req, res) => {
   const raw = req.ip || '';
-  const ip  = raw.replace(/^::ffff:/, ''); // normalize IPv6-mapped IPv4
+  const ip  = raw.replace(/^::ffff:/, '');
   const isLocal = ['127.0.0.1','::1'].includes(raw) || ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.');
-  if (!isLocal) return res.status(403).json({ error: 'Forbidden' });
+  if (!isLocal) return res.status(403).json({ success: false, error: 'Forbidden' });
   res.json({ apiKey: API_KEY, lndkReady, version: '2.0.0' });
 });
 
@@ -277,10 +280,10 @@ app.get('/', (req, res) => res.redirect('/dashboard.html'));
 
 // Créer une offer
 app.post('/api/v1/offers', apiLimiter, auth, (req, res) => {
-  if (!lndkReady) return res.status(503).json({ error: 'LNDK not ready', hint: 'LNDK is still building or not started' });
+  if (!lndkReady) return res.status(503).json({ success: false, error: 'LNDK not ready', hint: 'LNDK is still starting up' });
 
   const { amount, description, expiry, issuer, quantity } = req.body;
-  if (!description) return res.status(400).json({ error: 'description required' });
+  if (!description) return res.status(400).json({ success: false, error: 'description required' });
 
   const request = {};
   if (amount)      request.amount = BigInt(amount);
@@ -292,7 +295,7 @@ app.post('/api/v1/offers', apiLimiter, auth, (req, res) => {
   lndkClient.CreateOffer(request, (err, response) => {
     if (err) {
       console.error('LNDK CreateOffer error:', err.message);
-      return res.status(500).json({ error: 'LNDK error', message: err.message });
+      return res.status(500).json({ success: false, error: 'LNDK error', message: err.message });
     }
 
     const offer = {
@@ -324,7 +327,7 @@ app.get('/api/v1/offers', auth, (req, res) => {
 // Récupérer une offer
 app.get('/api/v1/offers/:id', auth, (req, res) => {
   const offer = loadOffers().find(o => o.id === req.params.id);
-  if (!offer) return res.status(404).json({ error: 'Offer not found' });
+  if (!offer) return res.status(404).json({ success: false, error: 'Offer not found' });
   res.json({ success: true, data: offer });
 });
 
@@ -332,7 +335,7 @@ app.get('/api/v1/offers/:id', auth, (req, res) => {
 app.delete('/api/v1/offers/:id', auth, (req, res) => {
   const offers = loadOffers();
   const idx = offers.findIndex(o => o.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'Offer not found' });
+  if (idx === -1) return res.status(404).json({ success: false, error: 'Offer not found' });
   offers[idx].active = false;
   saveOffers(offers);
   res.json({ success: true, message: 'Offer disabled', id: req.params.id });
@@ -341,7 +344,7 @@ app.delete('/api/v1/offers/:id', auth, (req, res) => {
 // QR Code
 app.get('/api/v1/offers/:id/qr', auth, (req, res) => {
   const offer = loadOffers().find(o => o.id === req.params.id);
-  if (!offer) return res.status(404).json({ error: 'Offer not found' });
+  if (!offer) return res.status(404).json({ success: false, error: 'Offer not found' });
   const size = Math.min(Math.max(parseInt(req.query.size) || 300, 100), 1000);
   res.json({
     success: true,
@@ -357,7 +360,7 @@ app.get('/api/v1/offers/:id/qr', auth, (req, res) => {
 // ============================================
 // BALANCE & NODE INFO
 // ============================================
-app.get('/api/v1/balance', auth, async (req, res) => {
+app.get('/api/v1/balance', auth, readLimiter, async (req, res) => {
   try {
     const [ch, chain, info] = await Promise.all([
       lndRestGet('/v1/balance/channels'),
@@ -380,21 +383,21 @@ app.get('/api/v1/balance', auth, async (req, res) => {
         pending:  info.num_pending_channels  || 0,
       },
       node: {
-        alias:       info.alias,
-        pubkey:      info.identity_pubkey,
-        synced:      info.synced_to_chain,
+        alias:        info.alias,
+        pubkey:       info.identity_pubkey,
+        synced:       info.synced_to_chain,
         block_height: info.block_height,
       },
     }});
-  } catch(err) {
-    res.status(500).json({ error: err.message });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
 // ============================================
 // PAYMENT HISTORY
 // ============================================
-app.get('/api/v1/payments', auth, async (req, res) => {
+app.get('/api/v1/payments', auth, readLimiter, async (req, res) => {
   try {
     const [sent, recv] = await Promise.all([
       lndRestGet('/v1/payments?max_payments=30&reversed=true&include_incomplete=false'),
@@ -422,8 +425,8 @@ app.get('/api/v1/payments', auth, async (req, res) => {
       }));
     const all = [...payments, ...invoices].sort((a, b) => b.date - a.date).slice(0, 40);
     res.json({ success: true, data: all });
-  } catch(err) {
-    res.status(500).json({ error: err.message });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -431,9 +434,9 @@ app.get('/api/v1/payments', auth, async (req, res) => {
 // PAY BOLT12 OFFER (LNDK)
 // ============================================
 app.post('/api/v1/pay', apiLimiter, auth, (req, res) => {
-  if (!lndkReady) return res.status(503).json({ error: 'LNDK not ready', hint: 'BTC node still syncing' });
+  if (!lndkReady) return res.status(503).json({ success: false, error: 'LNDK not ready' });
   const { offer, amount, payer_note } = req.body;
-  if (!offer || !offer.startsWith('lno')) return res.status(400).json({ error: 'Valid BOLT12 offer required (starts with lno)' });
+  if (!offer || !offer.startsWith('lno')) return res.status(400).json({ success: false, error: 'Valid BOLT12 offer required (starts with lno)' });
 
   const request = { offer };
   if (amount)     request.amount     = BigInt(amount);
@@ -443,19 +446,19 @@ app.post('/api/v1/pay', apiLimiter, auth, (req, res) => {
   deadline.setSeconds(deadline.getSeconds() + 90);
 
   lndkClient.PayOffer(request, { deadline }, (err, response) => {
-    if (err) return res.status(500).json({ error: 'Payment failed', message: err.message });
+    if (err) return res.status(500).json({ success: false, error: 'Payment failed', message: err.message });
     fireWebhooks('payment_sent', { preimage: response.payment_preimage, offer });
     res.json({ success: true, data: { preimage: response.payment_preimage } });
   });
 });
 
 // ============================================
-// GET INVOICE FROM OFFER (LNDK) — sans payer
+// GET INVOICE FROM OFFER (LNDK)
 // ============================================
 app.post('/api/v1/offers/invoice', apiLimiter, auth, (req, res) => {
-  if (!lndkReady) return res.status(503).json({ error: 'LNDK not ready' });
+  if (!lndkReady) return res.status(503).json({ success: false, error: 'LNDK not ready' });
   const { offer, amount, payer_note } = req.body;
-  if (!offer || !offer.startsWith('lno')) return res.status(400).json({ error: 'Valid BOLT12 offer required (starts with lno)' });
+  if (!offer || !offer.startsWith('lno')) return res.status(400).json({ success: false, error: 'Valid BOLT12 offer required (starts with lno)' });
 
   const request = { offer };
   if (amount)     request.amount     = BigInt(amount);
@@ -465,7 +468,7 @@ app.post('/api/v1/offers/invoice', apiLimiter, auth, (req, res) => {
   deadline.setSeconds(deadline.getSeconds() + 30);
 
   lndkClient.GetInvoice(request, { deadline }, (err, response) => {
-    if (err) return res.status(500).json({ error: 'GetInvoice failed', message: err.message });
+    if (err) return res.status(500).json({ success: false, error: 'GetInvoice failed', message: err.message });
     res.json({ success: true, data: { invoice: response.invoice_hex_str, contents: response.invoice_contents } });
   });
 });
@@ -474,9 +477,9 @@ app.post('/api/v1/offers/invoice', apiLimiter, auth, (req, res) => {
 // PAY BOLT12 INVOICE DIRECTLY (LNDK)
 // ============================================
 app.post('/api/v1/pay/invoice', apiLimiter, auth, (req, res) => {
-  if (!lndkReady) return res.status(503).json({ error: 'LNDK not ready' });
+  if (!lndkReady) return res.status(503).json({ success: false, error: 'LNDK not ready' });
   const { invoice, amount } = req.body;
-  if (!invoice || !invoice.startsWith('lni')) return res.status(400).json({ error: 'Valid BOLT12 invoice required (starts with lni)' });
+  if (!invoice || !invoice.startsWith('lni')) return res.status(400).json({ success: false, error: 'Valid BOLT12 invoice required (starts with lni)' });
 
   const request = { invoice };
   if (amount) request.amount = BigInt(amount);
@@ -485,7 +488,7 @@ app.post('/api/v1/pay/invoice', apiLimiter, auth, (req, res) => {
   deadline.setSeconds(deadline.getSeconds() + 90);
 
   lndkClient.PayInvoice(request, { deadline }, (err, response) => {
-    if (err) return res.status(500).json({ error: 'PayInvoice failed', message: err.message });
+    if (err) return res.status(500).json({ success: false, error: 'PayInvoice failed', message: err.message });
     fireWebhooks('payment_sent', { preimage: response.payment_preimage, invoice });
     res.json({ success: true, data: { preimage: response.payment_preimage } });
   });
@@ -495,12 +498,12 @@ app.post('/api/v1/pay/invoice', apiLimiter, auth, (req, res) => {
 // DECODE BOLT12 INVOICE (LNDK)
 // ============================================
 app.post('/api/v1/decode', auth, (req, res) => {
-  if (!lndkReady) return res.status(503).json({ error: 'LNDK not ready' });
+  if (!lndkReady) return res.status(503).json({ success: false, error: 'LNDK not ready' });
   const { invoice } = req.body;
-  if (!invoice || !invoice.startsWith('lni')) return res.status(400).json({ error: 'Valid BOLT12 invoice required (starts with lni)' });
+  if (!invoice || !invoice.startsWith('lni')) return res.status(400).json({ success: false, error: 'Valid BOLT12 invoice required (starts with lni)' });
 
   lndkClient.DecodeInvoice({ invoice }, (err, response) => {
-    if (err) return res.status(500).json({ error: 'Decode failed', message: err.message });
+    if (err) return res.status(500).json({ success: false, error: 'Decode failed', message: err.message });
     res.json({ success: true, data: response });
   });
 });
@@ -510,22 +513,24 @@ app.post('/api/v1/decode', auth, (req, res) => {
 // ============================================
 app.post('/api/v1/invoices', apiLimiter, auth, async (req, res) => {
   const { amount, description, expiry } = req.body;
-  if (!description) return res.status(400).json({ error: 'description required' });
+  if (!description) return res.status(400).json({ success: false, error: 'description required' });
   try {
     const data = await lndRestPost('/v1/invoices', { value: amount || 0, memo: description, expiry: expiry || 3600 });
     if (data.payment_request) {
       fireWebhooks('invoice_created', { payment_request: data.payment_request, amount, description });
       res.json({ success: true, data: { payment_request: data.payment_request, r_hash: data.r_hash } });
     } else {
-      res.status(500).json({ error: 'LND error', message: JSON.stringify(data) });
+      res.status(500).json({ success: false, error: 'LND error', message: JSON.stringify(data) });
     }
-  } catch(err) { res.status(500).json({ error: err.message }); }
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // ============================================
 // STATS
 // ============================================
-app.get('/api/v1/stats', auth, async (req, res) => {
+app.get('/api/v1/stats', auth, readLimiter, async (req, res) => {
   try {
     const [sent, recv] = await Promise.all([
       lndRestGet('/v1/payments?max_payments=200&reversed=true&include_incomplete=false'),
@@ -558,13 +563,15 @@ app.get('/api/v1/stats', auth, async (req, res) => {
       days: Object.entries(buckets).map(([date, v]) => ({ date, sent_sats: v.sent, received_sats: v.recv })),
       totals: { sent_sats: totalSent, received_sats: totalRecv, fees_paid: feesPaid, count: payments.length + invoices.length },
     }});
-  } catch(err) { res.status(500).json({ error: err.message }); }
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // ============================================
 // CSV EXPORT
 // ============================================
-app.get('/api/v1/payments/export', auth, async (req, res) => {
+app.get('/api/v1/payments/export', auth, readLimiter, async (req, res) => {
   try {
     const [sent, recv] = await Promise.all([
       lndRestGet('/v1/payments?max_payments=500&reversed=true&include_incomplete=false'),
@@ -577,7 +584,9 @@ app.get('/api/v1/payments/export', auth, async (req, res) => {
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="bolt12-payments-${new Date().toISOString().slice(0,10)}.csv"`);
     res.send(csv);
-  } catch(err) { res.status(500).json({ error: err.message }); }
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // ============================================
@@ -585,7 +594,7 @@ app.get('/api/v1/payments/export', auth, async (req, res) => {
 // ============================================
 app.get('/api/v1/public/offers/:id', (req, res) => {
   const offer = loadOffers().find(o => o.id === req.params.id && o.active !== false);
-  if (!offer) return res.status(404).json({ error: 'Offer not found' });
+  if (!offer) return res.status(404).json({ success: false, error: 'Offer not found' });
   res.json({ success: true, data: { id: offer.id, offer: offer.offer, description: offer.description, amount: offer.amount, issuer: offer.issuer } });
 });
 
@@ -598,7 +607,7 @@ app.get('/api/v1/templates', auth, (req, res) => res.json({ success: true, data:
 
 app.post('/api/v1/templates', auth, (req, res) => {
   const { name, amount, description } = req.body;
-  if (!name || !description) return res.status(400).json({ error: 'name and description required' });
+  if (!name || !description) return res.status(400).json({ success: false, error: 'name and description required' });
   const templates = loadJson(TEMPLATES_FILE);
   const t = { id: Date.now().toString(36), name, amount: amount || 0, description, createdAt: new Date().toISOString() };
   templates.push(t); saveJson(TEMPLATES_FILE, templates);
@@ -618,8 +627,8 @@ app.get('/api/v1/webhooks', auth, (req, res) => res.json({ success: true, data: 
 
 app.post('/api/v1/webhooks', auth, (req, res) => {
   const { url, event } = req.body;
-  if (!url || !event) return res.status(400).json({ error: 'url and event required' });
-  try { new URL(url); } catch { return res.status(400).json({ error: 'invalid URL' }); }
+  if (!url || !event) return res.status(400).json({ success: false, error: 'url and event required' });
+  try { new URL(url); } catch { return res.status(400).json({ success: false, error: 'invalid URL' }); }
   const hooks = loadJson(WEBHOOKS_FILE);
   const h = { id: Date.now().toString(36), url, event, active: true, createdAt: new Date().toISOString() };
   hooks.push(h); saveJson(WEBHOOKS_FILE, hooks);
@@ -634,7 +643,7 @@ app.delete('/api/v1/webhooks/:id', auth, (req, res) => {
 app.patch('/api/v1/webhooks/:id', auth, (req, res) => {
   const hooks = loadJson(WEBHOOKS_FILE);
   const idx = hooks.findIndex(h => h.id === req.params.id);
-  if (idx === -1) return res.status(404).json({ error: 'Webhook not found' });
+  if (idx === -1) return res.status(404).json({ success: false, error: 'Webhook not found' });
   hooks[idx].active = !hooks[idx].active;
   saveJson(WEBHOOKS_FILE, hooks);
   res.json({ success: true, data: hooks[idx] });
@@ -658,12 +667,31 @@ console.log(`⚡ LNDK gRPC: ${LNDK_HOST}`);
 
 initLndkClient();
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log('==========================================');
   console.log(`🚀 Port: ${PORT}`);
   console.log(`📊 Dashboard: http://localhost:${PORT}`);
   console.log(`🔍 Health: http://localhost:${PORT}/health`);
   console.log('==========================================');
 });
+
+// ============================================
+// GRACEFUL SHUTDOWN (Docker SIGTERM support)
+// ============================================
+function shutdown(signal) {
+  console.log(`\n${signal} received — shutting down gracefully...`);
+  server.close(() => {
+    console.log('Server closed. Goodbye.');
+    process.exit(0);
+  });
+  // Force exit if server takes too long to close
+  setTimeout(() => {
+    console.error('Forced shutdown after timeout.');
+    process.exit(1);
+  }, 10000);
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT',  () => shutdown('SIGINT'));
 
 module.exports = app;
