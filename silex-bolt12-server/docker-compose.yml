@@ -3,17 +3,34 @@ version: "3.7"
 services:
   app_proxy:
     environment:
-      APP_HOST: bolt12-server_server_1
+      APP_HOST: silex-bolt12-server_server_1
       APP_PORT: 3001
       PROXY_AUTH_ADD: "false"
+
+  lndk:
+    image: ghcr.io/silexperience210/lndk:latest
+    restart: on-failure
+    stop_grace_period: 1m
+    volumes:
+      - ${APP_LIGHTNING_NODE_DATA_DIR}:/lnd:ro
+      - ${APP_DATA_DIR}/lndk-data:/root/.lndk
+    command:
+      - "--address=https://${APP_LIGHTNING_NODE_IP}:10009"
+      - "--cert-path=/lnd/tls.cert"
+      - "--macaroon-path=/lnd/data/chain/bitcoin/mainnet/admin.macaroon"
+      - "--grpc-host=0.0.0.0"
+      - "--grpc-port=10010"
+      - "--data-dir=/root/.lndk"
 
   server:
     image: ghcr.io/silexperience210/bolt12-server:latest
     restart: on-failure
     stop_grace_period: 1m
+    depends_on:
+      - lndk
     volumes:
       - ${APP_LIGHTNING_NODE_DATA_DIR}:/lnd:ro
-      - /var/lib/docker/volumes/lndk_lndk-data/_data:/lndk-data:ro
+      - ${APP_DATA_DIR}/lndk-data:/lndk-data:ro
       - ${APP_DATA_DIR}/data:/app/data
     environment:
       NODE_ENV: production
@@ -21,8 +38,6 @@ services:
       LND_TLS_PATH: /lnd/tls.cert
       LND_MACAROON_PATH: /lnd/data/chain/bitcoin/mainnet/admin.macaroon
       LND_REST_HOST: ${APP_LIGHTNING_NODE_IP}:8080
-      LNDK_HOST: host.docker.internal:10010
+      LNDK_HOST: lndk:10010
       LNDK_TLS_PATH: /lndk-data/tls.cert
       LNDK_MACAROON_PATH: /lndk-data/admin.macaroon
-    extra_hosts:
-      - host.docker.internal:host-gateway
