@@ -14,6 +14,6 @@ COPY . .
 # Create directory for LND certs
 RUN mkdir -p /lnd
 
-EXPOSE 3000
+EXPOSE 3001
 
 CMD ["node", "server.js"]

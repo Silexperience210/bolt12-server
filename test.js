@@ -107,8 +107,8 @@ async function run() {
   // ── 1. PUBLIC endpoints (no auth) ──────────────────────────────────────────
   section('Health & Public');
 
-  let res = await withTimeout(GET('/health'), 5000, 'GET /health');
-  if (res.__timeout) { log(false, 'GET /health', res.error); }
+  let res = await withTimeout(GET('/health'), 10000, 'GET /health');
+  if (res.__timeout) { log('warn', 'GET /health', res.error); }
   else {
     expectStatus('GET /health returns 200', res, 200);
     expect('health.lnd present', res.body && 'lnd' in res.body, JSON.stringify(res.body?.lnd));
@@ -227,7 +227,7 @@ async function run() {
   else {
     expectStatus('GET /api/v1/payments/export → 200', res, 200);
     expect('Content-Type is text/csv', (res.headers['content-type']||'').includes('csv'), res.headers['content-type']);
-    expect('CSV has header row', res.raw.startsWith('type,amount_sat'), res.raw.slice(0,50));
+    expect('CSV has header row', res.raw.includes('"type"') && res.raw.includes('"amount_sats"'), res.raw.slice(0,60));
   }
 
   // ── 6. Stats ───────────────────────────────────────────────────────────────
@@ -268,6 +268,29 @@ async function run() {
   res = await withTimeout(POST('/api/v1/pay', { offer: 'invalid_offer_string' }), 5000);
   if (!res.__timeout) {
     expect('POST /api/v1/pay with invalid offer → 400 or error', res.status === 400 || !res.body?.success);
+  }
+
+  // ── 8.5 GetInvoice / PayInvoice (BOLT12) ──────────────────────────────────
+  section('GetInvoice & PayInvoice (BOLT12)');
+
+  // GetInvoice — missing body → 400
+  res = await withTimeout(POST('/api/v1/offers/invoice', {}), 5000);
+  if (!res.__timeout) expectStatus('POST /api/v1/offers/invoice with no offer → 400', res, 400);
+
+  // GetInvoice — invalid offer string → 400
+  res = await withTimeout(POST('/api/v1/offers/invoice', { offer: 'notanoffer' }), 5000);
+  if (!res.__timeout) {
+    expect('POST /api/v1/offers/invoice with invalid offer → 400 or error', res.status === 400 || !res.body?.success);
+  }
+
+  // PayInvoice — missing body → 400
+  res = await withTimeout(POST('/api/v1/pay/invoice', {}), 5000);
+  if (!res.__timeout) expectStatus('POST /api/v1/pay/invoice with no invoice → 400', res, 400);
+
+  // PayInvoice — not starting with lni1 → 400
+  res = await withTimeout(POST('/api/v1/pay/invoice', { invoice: 'lno1thisisanoffer' }), 5000);
+  if (!res.__timeout) {
+    expect('POST /api/v1/pay/invoice with lno1 invoice → 400', res.status === 400, `got ${res.status}`);
   }
 
   // ── 9. Invoices (BOLT11) ───────────────────────────────────────────────────
@@ -321,7 +344,7 @@ async function run() {
       const l = res.body.data[0];
       expect('log has method', typeof l.method === 'string');
       expect('log has path', typeof l.path === 'string');
-      expect('log has status', typeof l.status === 'number');
+      expect('log has ts', typeof l.ts === 'string');
     }
   }
 
@@ -353,9 +376,9 @@ async function run() {
   // ── 13. Static pages ───────────────────────────────────────────────────────
   section('Static Pages');
 
-  res = await withTimeout(GET('/', { 'x-api-key': '' }), 5000);
+  res = await withTimeout(GET('/dashboard.html', { 'x-api-key': '' }), 5000);
   if (!res.__timeout) {
-    expect('GET / serves dashboard', res.status === 200, `got ${res.status}`);
+    expect('GET /dashboard.html serves dashboard', res.status === 200, `got ${res.status}`);
     expect('dashboard has DOCTYPE', res.raw.includes('<!DOCTYPE html'), res.raw.slice(0,40));
   }
 

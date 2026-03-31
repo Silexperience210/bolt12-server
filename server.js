@@ -555,9 +555,8 @@ app.get('/api/v1/stats', auth, async (req, res) => {
       if (buckets[d]) buckets[d].recv += sats;
     });
     res.json({ success: true, data: {
-      total_sent: totalSent, total_recv: totalRecv, fees_paid: feesPaid,
-      payment_count: payments.length, invoice_count: invoices.length,
-      daily: Object.entries(buckets).map(([date, v]) => ({ date, ...v })),
+      days: Object.entries(buckets).map(([date, v]) => ({ date, sent_sats: v.sent, received_sats: v.recv })),
+      totals: { sent_sats: totalSent, received_sats: totalRecv, fees_paid: feesPaid, count: payments.length + invoices.length },
     }});
   } catch(err) { res.status(500).json({ error: err.message }); }
 });
@@ -630,6 +629,15 @@ app.post('/api/v1/webhooks', auth, (req, res) => {
 app.delete('/api/v1/webhooks/:id', auth, (req, res) => {
   saveJson(WEBHOOKS_FILE, loadJson(WEBHOOKS_FILE).filter(h => h.id !== req.params.id));
   res.json({ success: true });
+});
+
+app.patch('/api/v1/webhooks/:id', auth, (req, res) => {
+  const hooks = loadJson(WEBHOOKS_FILE);
+  const idx = hooks.findIndex(h => h.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'Webhook not found' });
+  hooks[idx].active = !hooks[idx].active;
+  saveJson(WEBHOOKS_FILE, hooks);
+  res.json({ success: true, data: hooks[idx] });
 });
 
 // ============================================

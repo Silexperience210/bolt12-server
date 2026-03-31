@@ -1432,11 +1432,12 @@ async function loadWebhooks(){
     const {data:whs}=await api('/webhooks');
     if(!whs||!whs.length){list.innerHTML=`<div style="text-align:center;padding:20px;font-size:13px;color:var(--muted)">Aucun webhook configuré</div>`;return;}
     list.innerHTML=whs.map(w=>`
-      <div class="wh-row">
+      <div class="wh-row" id="whr-${esc(w.id||'')}">
         <div class="wh-info">
-          <div class="wh-url">${esc(w.url)}</div>
-          <div class="wh-events">Événement : <strong style="color:var(--pL)">${esc(w.event||'*')}</strong></div>
+          <div class="wh-url" style="opacity:${w.active===false?.4:1}">${esc(w.url)}</div>
+          <div class="wh-events">Événement : <strong style="color:var(--pL)">${esc(w.event||'*')}</strong>${w.active===false?' · <span style="color:var(--red)">inactif</span>':''}</div>
         </div>
+        <button class="btn" style="padding:5px 11px;font-size:11px;white-space:nowrap;background:${w.active===false?'rgba(80,200,120,.15)':'rgba(255,180,50,.12)'};color:${w.active===false?'var(--green)':'var(--yellow)'}" onclick="toggleWebhook('${esc(w.id||'')}',${w.active===false})">&#x23F8;</button>
         <button class="btn btn-red" style="padding:5px 11px;font-size:11px;white-space:nowrap" onclick="delWebhook('${esc(w.id||'')}')">Suppr.</button>
       </div>`).join('');
   }catch(e){list.innerHTML=`<div style="text-align:center;padding:20px;font-size:13px;color:var(--red)">${esc(e.message)}</div>`;}
@@ -1453,8 +1454,15 @@ async function addWebhook(){
   }catch(e){toast(e.message,'err');}
 }
 async function delWebhook(id){
-  try{await api(`/webhooks/${id}`,{method:'DELETE'});toast('🗑 Webhook supprimé');loadWebhooks();}
+  try{await api(`/webhooks/${id}`,{method:'DELETE'});toast('Webhook supprimé');loadWebhooks();}
   catch(e){toast(e.message,'err');}
+}
+async function toggleWebhook(id,makeActive){
+  try{
+    await api(`/webhooks/${id}`,{method:'PATCH',body:JSON.stringify({active:makeActive})});
+    toast(makeActive?'Webhook activé':'Webhook mis en pause');
+    loadWebhooks();
+  }catch(e){toast(e.message,'err');}
 }
 
 // ── ACCESS LOGS ──
