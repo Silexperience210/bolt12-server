@@ -4,7 +4,7 @@ category: bitcoin
 name: Bolt12 Server
 version: "2.0.0"
 tagline: BOLT12 Lightning offers via LNDK
-icon: icon.svg
+icon: https://raw.githubusercontent.com/Silexperience210/bolt12-server/main/silex-bolt12-server/icon.svg
 description: >-
   Créez et gérez des BOLT12 offers sur votre nœud Lightning (LND + LNDK).
   Dashboard web avec animations plasma, historique des transactions,
