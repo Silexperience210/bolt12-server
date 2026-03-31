@@ -1,11 +1,2 @@
-id: silexperience210-apps
-name: Silexperience210 Apps
-tagline: BOLT12 Lightning tools for Umbrel
-icon: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCI+CiAgPGRlZnM+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImJnIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjEwMCUiIHkyPSIxMDAlIj4KICAgICAgPHN0b3Agb2Zmc2V0PSIwJSIgc3R5bGU9InN0b3AtY29sb3I6IzFhMTAzMyIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEwMCUiIHN0eWxlPSJzdG9wLWNvbG9yOiMyZDFiNmUiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgPC9kZWZzPgogIDxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiByeD0iMjIiIHJ5PSIyMiIgZmlsbD0idXJsKCNiZykiLz4KICA8dGV4dCB4PSI1MCIgeT0iNjUiIGZvbnQtc2l6ZT0iNTAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPuKšĄ8L3RleHQ+Cjwvc3ZnPg=="
-description: >-
-  Community app store by Silexperience210.
-  Apps focused on Lightning Network and BOLT12 protocol.
-developer: silexperience210
-website: https://github.com/Silexperience210/bolt12-server
-repo: https://github.com/Silexperience210/bolt12-server
-support: https://github.com/Silexperience210/bolt12-server/issues
+id: silex
+name: Silex Apps

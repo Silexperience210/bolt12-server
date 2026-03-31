@@ -1,0 +1,26 @@
+manifestVersion: 1.1
+id: silex-bolt12-server
+category: bitcoin
+name: Bolt12 Server
+version: "2.0.0"
+tagline: BOLT12 Lightning offers via LNDK
+icon: icon.svg
+description: >-
+  Créez et gérez des BOLT12 offers sur votre nœud Lightning (LND + LNDK).
+  Dashboard web avec animations plasma, historique des transactions,
+  statistiques 14 jours, décodage d'invoices BOLT12, webhooks configurables,
+  export CSV, et clé API auto-générée au premier démarrage.
+  Nécessite LNDK installé sur votre Umbrel pour activer le support BOLT12.
+developer: silexperience210
+website: https://github.com/Silexperience210/bolt12-server
+dependencies:
+  - lightning
+repo: https://github.com/Silexperience210/bolt12-server
+support: https://github.com/Silexperience210/bolt12-server/issues
+port: 3001
+gallery: []
+path: ""
+defaultUsername: ""
+defaultPassword: ""
+submitter: silexperience210
+submission: https://github.com/Silexperience210/bolt12-server
