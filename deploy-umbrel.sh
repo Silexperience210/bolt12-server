@@ -38,7 +38,7 @@ scp "${SCRIPT_DIR}/server.js"          "${UMBREL_USER}@${UMBREL_IP}:${REMOTE_DIR
 scp "${SCRIPT_DIR}/package.json"       "${UMBREL_USER}@${UMBREL_IP}:${REMOTE_DIR}/"
 scp "${SCRIPT_DIR}/Dockerfile"         "${UMBREL_USER}@${UMBREL_IP}:${REMOTE_DIR}/"
 scp "${SCRIPT_DIR}/docker-compose.yml" "${UMBREL_USER}@${UMBREL_IP}:${REMOTE_DIR}/"
-scp "${SCRIPT_DIR}/proto/lightning.proto" "${UMBREL_USER}@${UMBREL_IP}:${REMOTE_DIR}/proto/"
+scp "${SCRIPT_DIR}/proto/lndkrpc.proto" "${UMBREL_USER}@${UMBREL_IP}:${REMOTE_DIR}/proto/"
 
 # Copier le public/ si présent
 if [ -d "${SCRIPT_DIR}/public" ]; then
@@ -64,19 +64,24 @@ API_KEY=$(ssh "${UMBREL_USER}@${UMBREL_IP}" "
 ssh "${UMBREL_USER}@${UMBREL_IP}" "cat > ${REMOTE_DIR}/.env << 'ENVEOF'
 # Bolt12 Server - Auto-generated config
 NODE_ENV=production
-PORT=3000
+PORT=3001
 
-# LND via gRPC
-LND_HOST=host.docker.internal:10009
+# LND
+LND_REST_HOST=host.docker.internal:8080
 LND_TLS_PATH=/lnd/tls.cert
 LND_MACAROON_PATH=/lnd/data/chain/bitcoin/mainnet/admin.macaroon
+
+# LNDK
+LNDK_HOST=host.docker.internal:10010
+LNDK_TLS_PATH=/lndk-data/tls.cert
+LNDK_MACAROON_PATH=/lndk-data/admin.macaroon
 
 # API Key (keep secret!)
 API_KEY=${API_KEY}
 ENVEOF"
 
 echo "[OK] .env configured"
-echo "[INFO] API Key: ${API_KEY}"
+echo "[INFO] API Key: ${API_KEY:0:8}... (keep this secret)"
 
 # ---- 5. Build et démarrage Docker ----
 echo ""
@@ -94,19 +99,19 @@ echo "   VERIFICATION"
 echo "================================================"
 sleep 8
 
-HEALTH=$(curl -s --max-time 5 "http://${UMBREL_IP}:3000/health" 2>/dev/null)
+HEALTH=$(curl -s --max-time 5 "http://${UMBREL_IP}:3001/health" 2>/dev/null)
 if echo "$HEALTH" | grep -q '"status":"ok"'; then
     echo "[OK] Server is online!"
     echo ""
-    echo "  Dashboard : http://${UMBREL_IP}:3000"
-    echo "  Health    : http://${UMBREL_IP}:3000/health"
+    echo "  Dashboard : http://${UMBREL_IP}:3001"
+    echo "  Health    : http://${UMBREL_IP}:3001/health"
     echo "  API Key   : ${API_KEY}"
 else
     echo "[!] Server not responding yet. Check logs with:"
     echo "    ssh ${UMBREL_USER}@${UMBREL_IP} 'docker logs bolt12-server'"
     echo ""
     echo "  Or wait 30s and test:"
-    echo "    curl http://${UMBREL_IP}:3000/health"
+    echo "    curl http://${UMBREL_IP}:3001/health"
 fi
 
 echo ""

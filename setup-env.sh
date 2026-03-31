@@ -9,10 +9,13 @@ if [ ! -f .env ]; then
               || cat /proc/sys/kernel/random/uuid | tr -d -)
     cat > .env << ENVEOF
 NODE_ENV=production
-PORT=3000
-LND_HOST=host.docker.internal:10009
+PORT=3001
+LND_REST_HOST=host.docker.internal:8080
 LND_TLS_PATH=/lnd/tls.cert
 LND_MACAROON_PATH=/lnd/data/chain/bitcoin/mainnet/admin.macaroon
+LNDK_HOST=host.docker.internal:10010
+LNDK_TLS_PATH=/lndk-data/tls.cert
+LNDK_MACAROON_PATH=/lndk-data/admin.macaroon
 API_KEY=${API_KEY}
 ENVEOF
     echo "[OK] .env cree"
