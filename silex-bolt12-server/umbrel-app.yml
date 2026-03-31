@@ -3,14 +3,27 @@ id: silex-bolt12-server
 category: bitcoin
 name: Bolt12 Server
 version: "2.0.0"
-tagline: BOLT12 Lightning offers via LNDK
+tagline: Accept BOLT12 payments on your Lightning node — LNDK included
 icon: https://raw.githubusercontent.com/Silexperience210/bolt12-server/main/silex-bolt12-server/icon.svg
 description: >-
-  Créez et gérez des BOLT12 offers sur votre nœud Lightning (LND + LNDK).
-  Dashboard web avec animations plasma, historique des transactions,
-  statistiques 14 jours, décodage d'invoices BOLT12, webhooks configurables,
-  export CSV, et clé API auto-générée au premier démarrage.
-  LNDK est inclus automatiquement — aucune installation séparée requise.
+  Create and manage BOLT12 offers on your Lightning node (LND).
+  Web dashboard with plasma animations, payment history, 14-day stats,
+  BOLT12 invoice decoding, configurable webhooks, CSV export,
+  and auto-generated API key on first start.
+  LNDK is bundled automatically — no separate installation required.
+
+
+  ── PREREQUISITE (one time only) ──
+
+  Before installing, your LND node needs 3 protocol flags enabled for
+  onion messaging (required by BOLT12). This cannot be done automatically.
+
+  Run this single command via SSH on your Umbrel node:
+
+  bash <(curl -s https://raw.githubusercontent.com/Silexperience210/bolt12-server/main/setup-lnd-flags.sh)
+
+  The script will safely add the flags to lnd.conf and restart LND (~30s).
+  After that, install this app — everything else is fully automatic.
 developer: silexperience210
 website: https://github.com/Silexperience210/bolt12-server
 dependencies:
