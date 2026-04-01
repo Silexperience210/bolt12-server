@@ -1,15 +1,36 @@
 const express = require('express');
-const grpc = require('@grpc/grpc-js');
+const grpc    = require('@grpc/grpc-js');
 const protoLoader = require('@grpc/proto-loader');
-const rateLimit = require('express-rate-limit');
-const https = require('https');
-const http = require('http');
-const path = require('path');
-const fs = require('fs');
+const rateLimit   = require('express-rate-limit');
+const https   = require('https');
+const http    = require('http');
+const path    = require('path');
+const fs      = require('fs');
+const crypto  = require('crypto');
 require('dotenv').config();
 
 const app = express();
 app.set('trust proxy', 1); // Umbrel app_proxy sits in front
+
+// ============================================
+// SECURITY HEADERS
+// ============================================
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; " +
+    "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; " +
+    "style-src 'self' 'unsafe-inline'; " +
+    "img-src 'self' data: https://api.qrserver.com; " +
+    "connect-src 'self'; " +
+    "font-src 'self'"
+  );
+  next();
+});
 
 // ============================================
 // RATE LIMITING
@@ -32,7 +53,7 @@ const readLimiter = rateLimit({
 });
 
 app.use(limiter);
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 app.use(express.static('public'));
 
 // ============================================
@@ -55,10 +76,9 @@ if (!API_KEY) {
   if (fs.existsSync(KEY_FILE)) {
     API_KEY = fs.readFileSync(KEY_FILE, 'utf8').trim();
   } else {
-    const crypto = require('crypto');
     API_KEY = crypto.randomBytes(32).toString('hex');
     fs.writeFileSync(KEY_FILE, API_KEY);
-    console.log(`🔑 API Key generated — visible via /api/v1/config on local network`);
+    console.log('🔑 API Key generated — visible via /api/v1/config on local network');
   }
 }
 
@@ -68,14 +88,64 @@ if (!fs.existsSync(LND_MACAROON_PATH)) { console.error(`❌ Macaroon not found: 
 if (!fs.existsSync(OFFERS_FILE)) fs.writeFileSync(OFFERS_FILE, '[]');
 
 // ============================================
-// LOCAL OFFER STORE (LNDK n'a pas ListOffers)
+// ATOMIC JSON STORE HELPERS (prevents corruption)
 // ============================================
-function loadOffers() {
-  try { return JSON.parse(fs.readFileSync(OFFERS_FILE, 'utf8')); }
-  catch { return []; }
+const TEMPLATES_FILE = path.join(DATA_DIR, 'templates.json');
+const WEBHOOKS_FILE  = path.join(DATA_DIR, 'webhooks.json');
+const LOG_FILE       = path.join(DATA_DIR, 'access_log.json');
+[TEMPLATES_FILE, WEBHOOKS_FILE, LOG_FILE].forEach(f => {
+  if (!fs.existsSync(f)) fs.writeFileSync(f, '[]');
+});
+
+function loadJson(file, def = []) {
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return def; }
 }
-function saveOffers(offers) {
-  fs.writeFileSync(OFFERS_FILE, JSON.stringify(offers, null, 2));
+
+/** Atomic write: write to .tmp then rename — safe against power-loss corruption */
+function saveJson(file, data) {
+  const tmp = file + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
+  fs.renameSync(tmp, file);
+}
+
+function loadOffers() { return loadJson(OFFERS_FILE, []); }
+function saveOffers(offers) { saveJson(OFFERS_FILE, offers); }
+
+// ============================================
+// INPUT VALIDATION HELPERS
+// ============================================
+const MAX_SATS = 21_000_000n * 100_000_000n; // 21M BTC in sats
+
+/**
+ * Parse and validate a BigInt amount value.
+ * Returns BigInt or throws on invalid/negative/over-supply.
+ */
+function parseBigIntAmount(val, fieldName = 'amount') {
+  if (val === undefined || val === null || val === '' || val === 0) return undefined;
+  let n;
+  try { n = BigInt(val); } catch {
+    throw new Error(`${fieldName} must be a valid integer`);
+  }
+  if (n < 0n)        throw new Error(`${fieldName} must be positive`);
+  if (n > MAX_SATS)  throw new Error(`${fieldName} exceeds maximum Bitcoin supply`);
+  return n;
+}
+
+function truncate(str, max) {
+  if (typeof str !== 'string') return str;
+  return str.slice(0, max);
+}
+
+// ============================================
+// SSRF PROTECTION FOR WEBHOOKS
+// ============================================
+const PRIVATE_RANGES = /^(127\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|0\.0\.0\.0|::1$|localhost$)/i;
+
+function isPrivateHost(urlStr) {
+  try {
+    const u = new URL(urlStr);
+    return PRIVATE_RANGES.test(u.hostname);
+  } catch { return true; }
 }
 
 // ============================================
@@ -115,7 +185,11 @@ function lndRestPost(endpoint, body) {
     const req = https.request({
       hostname: host, port: parseInt(port) || 8080, path: endpoint, method: 'POST',
       ca: lndTlsCert, servername: 'localhost',
-      headers: { 'Grpc-Metadata-macaroon': lndMacaroon, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) },
+      headers: {
+        'Grpc-Metadata-macaroon': lndMacaroon,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(payload),
+      },
     }, res => {
       let data = '';
       res.on('data', chunk => data += chunk);
@@ -127,26 +201,26 @@ function lndRestPost(endpoint, body) {
 }
 
 // ============================================
-// GENERIC JSON STORE HELPERS
-// ============================================
-const TEMPLATES_FILE = path.join(DATA_DIR, 'templates.json');
-const WEBHOOKS_FILE  = path.join(DATA_DIR, 'webhooks.json');
-const LOG_FILE       = path.join(DATA_DIR, 'access_log.json');
-[TEMPLATES_FILE, WEBHOOKS_FILE, LOG_FILE].forEach(f => { if (!fs.existsSync(f)) fs.writeFileSync(f, '[]'); });
-
-function loadJson(file, def = []) {
-  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return def; }
-}
-function saveJson(file, data) { fs.writeFileSync(file, JSON.stringify(data, null, 2)); }
-
-// ============================================
-// ACCESS LOG MIDDLEWARE
+// ACCESS LOG MIDDLEWARE (async — does not block request)
 // ============================================
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/')) {
-    const logs = loadJson(LOG_FILE, []);
-    logs.unshift({ method: req.method, path: req.path, ip: req.ip || '', ts: new Date().toISOString(), authed: !!req.headers['x-api-key'] });
-    saveJson(LOG_FILE, logs.slice(0, 300));
+    const entry = {
+      method: req.method,
+      path: req.path,
+      ip: req.ip || '',
+      ts: new Date().toISOString(),
+      authed: !!req.headers['x-api-key'],
+    };
+    setImmediate(() => {
+      try {
+        const logs = loadJson(LOG_FILE, []);
+        logs.unshift(entry);
+        saveJson(LOG_FILE, logs.slice(0, 300));
+      } catch (err) {
+        console.warn('[log] write failed:', err.message);
+      }
+    });
   }
   next();
 });
@@ -160,13 +234,20 @@ function fireWebhooks(event, data) {
     try {
       const u = new URL(wh.url);
       const body = JSON.stringify({ event, data, ts: new Date().toISOString() });
-      const mod = u.protocol === 'https:' ? require('https') : http;
+      const mod = u.protocol === 'https:' ? https : http;
       const r = mod.request({
         hostname: u.hostname,
         port: u.port || (u.protocol === 'https:' ? 443 : 80),
         path: u.pathname + u.search,
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(body),
+        },
+      });
+      // 5-second timeout — prevent hanging connections
+      r.setTimeout(5000, () => {
+        r.destroy(new Error('Webhook timeout'));
       });
       r.on('error', (err) => {
         console.warn(`[webhook] Failed [${event}] → ${wh.url}: ${err.message}`);
@@ -179,10 +260,11 @@ function fireWebhooks(event, data) {
 }
 
 // ============================================
-// LNDK gRPC CLIENT (BOLT12 offers)
+// LNDK gRPC CLIENT with exponential-backoff retry
 // ============================================
 let lndkClient = null;
 let lndkReady  = false;
+let _retryTimer = null;
 
 function initLndkClient() {
   try {
@@ -224,12 +306,25 @@ function initLndkClient() {
 
     lndkClient = new lndkrpc.Offers(LNDK_HOST, creds);
     lndkReady  = true;
+    clearTimeout(_retryTimer);
     console.log(`✅ LNDK client initialized at ${LNDK_HOST}`);
     return true;
   } catch (err) {
     console.warn('⚠️  LNDK init failed:', err.message);
     return false;
   }
+}
+
+/** Retry LNDK connection with exponential backoff (max 60s) */
+function scheduleLndkRetry(attempt = 1) {
+  if (lndkReady) return;
+  const delay = Math.min(60000, 2000 * Math.pow(2, attempt - 1));
+  console.log(`[lndk] Retry in ${Math.round(delay / 1000)}s (attempt ${attempt})…`);
+  _retryTimer = setTimeout(() => {
+    if (!lndkReady) {
+      if (!initLndkClient()) scheduleLndkRetry(attempt + 1);
+    }
+  }, delay);
 }
 
 // ============================================
@@ -263,11 +358,12 @@ app.get('/health', async (req, res) => {
   }
 });
 
-// Config (réseau local seulement)
+// Config endpoint — local network only
 app.get('/api/v1/config', (req, res) => {
   const raw = req.ip || '';
   const ip  = raw.replace(/^::ffff:/, '');
-  const isLocal = ['127.0.0.1','::1'].includes(raw) || ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.');
+  const isLocal = ['127.0.0.1', '::1'].includes(raw) ||
+                  ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.');
   if (!isLocal) return res.status(403).json({ success: false, error: 'Forbidden' });
   res.json({ apiKey: API_KEY, lndkReady, version: '2.0.0' });
 });
@@ -278,19 +374,31 @@ app.get('/', (req, res) => res.redirect('/dashboard.html'));
 // BOLT12 OFFER ENDPOINTS
 // ============================================
 
-// Créer une offer
+// Create an offer
 app.post('/api/v1/offers', apiLimiter, auth, (req, res) => {
   if (!lndkReady) return res.status(503).json({ success: false, error: 'LNDK not ready', hint: 'LNDK is still starting up' });
 
   const { amount, description, expiry, issuer, quantity } = req.body;
   if (!description) return res.status(400).json({ success: false, error: 'description required' });
 
-  const request = {};
-  if (amount)      request.amount = BigInt(amount);
-  if (description) request.description = description;
-  if (expiry)      request.expiry = BigInt(expiry);
-  if (issuer)      request.issuer = issuer;
-  if (quantity)    request.quantity = BigInt(quantity);
+  // Validate and truncate inputs
+  const desc    = truncate(String(description), 1024);
+  const issuerV = issuer ? truncate(String(issuer), 256) : undefined;
+
+  let amountB, expiryB, quantityB;
+  try {
+    amountB   = parseBigIntAmount(amount,   'amount');
+    expiryB   = parseBigIntAmount(expiry,   'expiry');
+    quantityB = parseBigIntAmount(quantity, 'quantity');
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+
+  const request = { description: desc };
+  if (amountB   !== undefined) request.amount   = amountB;
+  if (expiryB   !== undefined) request.expiry   = expiryB;
+  if (issuerV)                 request.issuer   = issuerV;
+  if (quantityB !== undefined) request.quantity = quantityB;
 
   lndkClient.CreateOffer(request, (err, response) => {
     if (err) {
@@ -298,40 +406,45 @@ app.post('/api/v1/offers', apiLimiter, auth, (req, res) => {
       return res.status(500).json({ success: false, error: 'LNDK error', message: err.message });
     }
 
+    // Generate collision-free unique ID
+    const existingOffers = loadOffers();
+    let id;
+    do { id = crypto.randomBytes(16).toString('hex'); }
+    while (existingOffers.some(o => o.id === id));
+
     const offer = {
-      id: Buffer.from(response.offer).toString('base64').slice(0, 16),
-      offer: response.offer,
-      description,
-      amount: amount || 0,
-      issuer: issuer || null,
-      expiry: expiry || null,
-      quantity: quantity || null,
-      active: true,
-      createdAt: new Date().toISOString(),
+      id,
+      offer:       response.offer,
+      description: desc,
+      amount:      amount || 0,
+      issuer:      issuerV || null,
+      expiry:      expiry  || null,
+      quantity:    quantity || null,
+      active:      true,
+      createdAt:   new Date().toISOString(),
     };
 
-    const offers = loadOffers();
-    offers.push(offer);
-    saveOffers(offers);
+    existingOffers.push(offer);
+    saveOffers(existingOffers);
 
     res.json({ success: true, data: offer });
   });
 });
 
-// Lister les offers
+// List active offers
 app.get('/api/v1/offers', auth, (req, res) => {
-  const offers = loadOffers().filter(o => o.active !== false);
+  const offers = loadOffers().filter(o => o.active === true);
   res.json({ success: true, data: offers, count: offers.length });
 });
 
-// Récupérer une offer
+// Get offer by ID
 app.get('/api/v1/offers/:id', auth, (req, res) => {
   const offer = loadOffers().find(o => o.id === req.params.id);
   if (!offer) return res.status(404).json({ success: false, error: 'Offer not found' });
   res.json({ success: true, data: offer });
 });
 
-// Désactiver une offer
+// Disable an offer
 app.delete('/api/v1/offers/:id', auth, (req, res) => {
   const offers = loadOffers();
   const idx = offers.findIndex(o => o.id === req.params.id);
@@ -349,10 +462,10 @@ app.get('/api/v1/offers/:id/qr', auth, (req, res) => {
   res.json({
     success: true,
     data: {
-      offer: offer.offer,
-      qrUrl: `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(offer.offer)}`,
+      offer:      offer.offer,
+      qrUrl:      `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(offer.offer)}`,
       bitcoinUri: `bitcoin:?lno=${offer.offer}`,
-      id: offer.id,
+      id:         offer.id,
     }
   });
 });
@@ -438,9 +551,14 @@ app.post('/api/v1/pay', apiLimiter, auth, (req, res) => {
   const { offer, amount, payer_note } = req.body;
   if (!offer || !offer.startsWith('lno')) return res.status(400).json({ success: false, error: 'Valid BOLT12 offer required (starts with lno)' });
 
+  let amountB;
+  try { amountB = parseBigIntAmount(amount, 'amount'); } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+
   const request = { offer };
-  if (amount)     request.amount     = BigInt(amount);
-  if (payer_note) request.payer_note = payer_note;
+  if (amountB !== undefined) request.amount = amountB;
+  if (payer_note) request.payer_note = truncate(String(payer_note), 256);
 
   const deadline = new Date();
   deadline.setSeconds(deadline.getSeconds() + 90);
@@ -460,9 +578,14 @@ app.post('/api/v1/offers/invoice', apiLimiter, auth, (req, res) => {
   const { offer, amount, payer_note } = req.body;
   if (!offer || !offer.startsWith('lno')) return res.status(400).json({ success: false, error: 'Valid BOLT12 offer required (starts with lno)' });
 
+  let amountB;
+  try { amountB = parseBigIntAmount(amount, 'amount'); } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+
   const request = { offer };
-  if (amount)     request.amount     = BigInt(amount);
-  if (payer_note) request.payer_note = payer_note;
+  if (amountB !== undefined) request.amount = amountB;
+  if (payer_note) request.payer_note = truncate(String(payer_note), 256);
 
   const deadline = new Date();
   deadline.setSeconds(deadline.getSeconds() + 30);
@@ -481,8 +604,13 @@ app.post('/api/v1/pay/invoice', apiLimiter, auth, (req, res) => {
   const { invoice, amount } = req.body;
   if (!invoice || !invoice.startsWith('lni')) return res.status(400).json({ success: false, error: 'Valid BOLT12 invoice required (starts with lni)' });
 
+  let amountB;
+  try { amountB = parseBigIntAmount(amount, 'amount'); } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+
   const request = { invoice };
-  if (amount) request.amount = BigInt(amount);
+  if (amountB !== undefined) request.amount = amountB;
 
   const deadline = new Date();
   deadline.setSeconds(deadline.getSeconds() + 90);
@@ -515,7 +643,11 @@ app.post('/api/v1/invoices', apiLimiter, auth, async (req, res) => {
   const { amount, description, expiry } = req.body;
   if (!description) return res.status(400).json({ success: false, error: 'description required' });
   try {
-    const data = await lndRestPost('/v1/invoices', { value: amount || 0, memo: description, expiry: expiry || 3600 });
+    const data = await lndRestPost('/v1/invoices', {
+      value: amount || 0,
+      memo: truncate(String(description), 1024),
+      expiry: expiry || 3600,
+    });
     if (data.payment_request) {
       fireWebhooks('invoice_created', { payment_request: data.payment_request, amount, description });
       res.json({ success: true, data: { payment_request: data.payment_request, r_hash: data.r_hash } });
@@ -548,7 +680,7 @@ app.get('/api/v1/stats', auth, readLimiter, async (req, res) => {
     let totalSent = 0, totalRecv = 0, feesPaid = 0;
     payments.forEach(p => {
       const sats = parseInt(p.value_sat || p.value || 0);
-      const fee = parseInt(p.fee_sat || p.fee || 0);
+      const fee  = parseInt(p.fee_sat || p.fee || 0);
       totalSent += sats; feesPaid += fee;
       const d = new Date(parseInt(p.creation_time_ns ? p.creation_time_ns / 1e9 : p.creation_date) * 1000).toISOString().slice(0, 10);
       if (buckets[d]) buckets[d].sent += sats;
@@ -560,7 +692,7 @@ app.get('/api/v1/stats', auth, readLimiter, async (req, res) => {
       if (buckets[d]) buckets[d].recv += sats;
     });
     res.json({ success: true, data: {
-      days: Object.entries(buckets).map(([date, v]) => ({ date, sent_sats: v.sent, received_sats: v.recv })),
+      days:   Object.entries(buckets).map(([date, v]) => ({ date, sent_sats: v.sent, received_sats: v.recv })),
       totals: { sent_sats: totalSent, received_sats: totalRecv, fees_paid: feesPaid, count: payments.length + invoices.length },
     }});
   } catch (err) {
@@ -577,12 +709,28 @@ app.get('/api/v1/payments/export', auth, readLimiter, async (req, res) => {
       lndRestGet('/v1/payments?max_payments=500&reversed=true&include_incomplete=false'),
       lndRestGet('/v1/invoices?reversed=true&num_max_invoices=500'),
     ]);
-    const rows = [['type','date','amount_sats','fee_sats','status','hash','description']];
-    (sent.payments || []).forEach(p => rows.push(['sent', new Date(parseInt(p.creation_time_ns ? p.creation_time_ns/1e9 : p.creation_date)*1000).toISOString(), p.value_sat||p.value||0, p.fee_sat||p.fee||0, p.status, p.payment_hash, '']));
-    (recv.invoices||[]).filter(i=>i.state==='SETTLED').forEach(i => rows.push(['received', new Date(parseInt(i.settle_date)*1000).toISOString(), i.amt_paid_sat||0, 0, 'SETTLED', i.r_hash, i.memo||'']));
-    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const rows = [['type', 'date', 'amount_sats', 'fee_sats', 'status', 'hash', 'description']];
+    (sent.payments || []).forEach(p => rows.push([
+      'sent',
+      new Date(parseInt(p.creation_time_ns ? p.creation_time_ns / 1e9 : p.creation_date) * 1000).toISOString(),
+      p.value_sat || p.value || 0,
+      p.fee_sat || p.fee || 0,
+      p.status,
+      p.payment_hash,
+      '',
+    ]));
+    (recv.invoices || []).filter(i => i.state === 'SETTLED').forEach(i => rows.push([
+      'received',
+      new Date(parseInt(i.settle_date) * 1000).toISOString(),
+      i.amt_paid_sat || 0,
+      0,
+      'SETTLED',
+      i.r_hash,
+      i.memo || '',
+    ]));
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
     res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename="bolt12-payments-${new Date().toISOString().slice(0,10)}.csv"`);
+    res.setHeader('Content-Disposition', `attachment; filename="bolt12-payments-${new Date().toISOString().slice(0, 10)}.csv"`);
     res.send(csv);
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -593,45 +741,66 @@ app.get('/api/v1/payments/export', auth, readLimiter, async (req, res) => {
 // PUBLIC OFFER (no auth — for pay page)
 // ============================================
 app.get('/api/v1/public/offers/:id', (req, res) => {
-  const offer = loadOffers().find(o => o.id === req.params.id && o.active !== false);
+  // Explicit active === true check (not `!== false`) to avoid returning
+  // offers where active is undefined/null/missing
+  const offer = loadOffers().find(o => o.id === req.params.id && o.active === true);
   if (!offer) return res.status(404).json({ success: false, error: 'Offer not found' });
-  res.json({ success: true, data: { id: offer.id, offer: offer.offer, description: offer.description, amount: offer.amount, issuer: offer.issuer } });
+  res.json({ success: true, data: {
+    id:          offer.id,
+    offer:       offer.offer,
+    description: offer.description,
+    amount:      offer.amount,
+    issuer:      offer.issuer,
+  }});
 });
 
-app.get('/pay/:id', (req, res) => res.redirect(`/pay.html?id=${req.params.id}`));
+app.get('/pay/:id', (req, res) => res.redirect(`/pay.html?id=${encodeURIComponent(req.params.id)}`));
 
 // ============================================
 // TEMPLATES
 // ============================================
-app.get('/api/v1/templates', auth, (req, res) => res.json({ success: true, data: loadJson(TEMPLATES_FILE) }));
+app.get('/api/v1/templates', auth, (req, res) => {
+  res.json({ success: true, data: loadJson(TEMPLATES_FILE) });
+});
 
 app.post('/api/v1/templates', auth, (req, res) => {
   const { name, amount, description } = req.body;
   if (!name || !description) return res.status(400).json({ success: false, error: 'name and description required' });
   const templates = loadJson(TEMPLATES_FILE);
-  const t = { id: Date.now().toString(36), name, amount: amount || 0, description, createdAt: new Date().toISOString() };
-  templates.push(t); saveJson(TEMPLATES_FILE, templates);
+  const t = {
+    id:          Date.now().toString(36),
+    name:        truncate(String(name), 256),
+    amount:      amount || 0,
+    description: truncate(String(description), 1024),
+    createdAt:   new Date().toISOString(),
+  };
+  templates.push(t);
+  saveJson(TEMPLATES_FILE, templates);
   res.json({ success: true, data: t });
 });
 
 app.delete('/api/v1/templates/:id', auth, (req, res) => {
-  const templates = loadJson(TEMPLATES_FILE).filter(t => t.id !== req.params.id);
-  saveJson(TEMPLATES_FILE, templates);
+  saveJson(TEMPLATES_FILE, loadJson(TEMPLATES_FILE).filter(t => t.id !== req.params.id));
   res.json({ success: true });
 });
 
 // ============================================
 // WEBHOOKS
 // ============================================
-app.get('/api/v1/webhooks', auth, (req, res) => res.json({ success: true, data: loadJson(WEBHOOKS_FILE) }));
+app.get('/api/v1/webhooks', auth, (req, res) => {
+  res.json({ success: true, data: loadJson(WEBHOOKS_FILE) });
+});
 
 app.post('/api/v1/webhooks', auth, (req, res) => {
   const { url, event } = req.body;
   if (!url || !event) return res.status(400).json({ success: false, error: 'url and event required' });
-  try { new URL(url); } catch { return res.status(400).json({ success: false, error: 'invalid URL' }); }
+  try { new URL(url); } catch { return res.status(400).json({ success: false, error: 'Invalid URL' }); }
+  // Block SSRF — webhook URLs must be public
+  if (isPrivateHost(url)) return res.status(400).json({ success: false, error: 'Private/local URLs are not allowed for webhooks' });
   const hooks = loadJson(WEBHOOKS_FILE);
   const h = { id: Date.now().toString(36), url, event, active: true, createdAt: new Date().toISOString() };
-  hooks.push(h); saveJson(WEBHOOKS_FILE, hooks);
+  hooks.push(h);
+  saveJson(WEBHOOKS_FILE, hooks);
   res.json({ success: true, data: h });
 });
 
@@ -665,7 +834,10 @@ console.log('==========================================');
 console.log(`📡 LND REST : ${LND_REST_HOST}`);
 console.log(`⚡ LNDK gRPC: ${LNDK_HOST}`);
 
-initLndkClient();
+if (!initLndkClient()) {
+  // LNDK may not be ready yet (slow start) — retry with backoff
+  scheduleLndkRetry(1);
+}
 
 const server = app.listen(PORT, () => {
   console.log('==========================================');
@@ -679,7 +851,8 @@ const server = app.listen(PORT, () => {
 // GRACEFUL SHUTDOWN (Docker SIGTERM support)
 // ============================================
 function shutdown(signal) {
-  console.log(`\n${signal} received — shutting down gracefully...`);
+  console.log(`\n${signal} received — shutting down gracefully…`);
+  clearTimeout(_retryTimer);
   server.close(() => {
     console.log('Server closed. Goodbye.');
     process.exit(0);

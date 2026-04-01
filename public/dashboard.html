@@ -941,17 +941,8 @@ textarea.inp{resize:vertical;min-height:80px;line-height:1.5}
 
 <!-- ── APP ── -->
 <script>
-let KEY = localStorage.getItem('b12k') || '';
+let KEY = sessionStorage.getItem('b12k') || '';
 let currentOffer = null;
-const SESSION_TTL = 48 * 3600 * 1000; // 48h
-
-// Check session expiry on load
-(function checkSession(){
-  const ts = parseInt(localStorage.getItem('b12k_ts')||'0');
-  if(KEY && ts && Date.now()-ts > SESSION_TTL){
-    KEY=''; localStorage.removeItem('b12k'); localStorage.removeItem('b12k_ts');
-  }
-})();
 
 // ── TOAST ──
 let _tt;
@@ -1009,10 +1000,10 @@ function copyKey(){
 function saveKey(){
   const k=document.getElementById('key-inp').value.trim();
   if(!k){document.getElementById('auth-err').textContent='Clé requise';document.getElementById('auth-err').style.display='';return;}
-  KEY=k; localStorage.setItem('b12k',k); localStorage.setItem('b12k_ts',Date.now()); hideAuth(); init();
+  KEY=k; sessionStorage.setItem('b12k',k); hideAuth(); init();
 }
 function logout(){
-  KEY=''; localStorage.removeItem('b12k'); localStorage.removeItem('b12k_ts');
+  KEY=''; sessionStorage.removeItem('b12k');
   toast('Déconnecté','ok'); showAuth();
 }
 document.getElementById('auth-ov').addEventListener('click',e=>{
@@ -1022,7 +1013,7 @@ document.getElementById('auth-ov').addEventListener('click',e=>{
 // ── API ──
 async function api(ep, opts={}){
   const r=await fetch(`/api/v1${ep}`,{...opts,headers:{'Content-Type':'application/json','x-api-key':KEY,...(opts.headers||{})}});
-  if(r.status===401){KEY='';localStorage.removeItem('b12k');showAuth();throw new Error('Clé API invalide');}
+  if(r.status===401){KEY='';sessionStorage.removeItem('b12k');showAuth();throw new Error('Clé API invalide');}
   const d=await r.json().catch(()=>({}));
   if(!r.ok) throw new Error(d.message||d.error||`HTTP ${r.status}`);
   return d;
@@ -1079,7 +1070,7 @@ async function init(){
   if(!KEY){
     try{
       const r=await fetch('/api/v1/config');
-      if(r.ok){const c=await r.json();if(c.apiKey){KEY=c.apiKey;localStorage.setItem('b12k',KEY);localStorage.setItem('b12k_ts',Date.now());}}
+      if(r.ok){const c=await r.json();if(c.apiKey){KEY=c.apiKey;sessionStorage.setItem('b12k',KEY);}}
     }catch{}
   }
   if(!KEY){showAuth();return;}
@@ -1517,11 +1508,8 @@ async function loadLogs(){
 
 // ── SESSION INFO ──
 function updateSessionInfo(){
-  const ts=parseInt(localStorage.getItem('b12k_ts')||'0');
   const el=document.getElementById('session-expiry');
-  if(!ts){el.textContent='Session : non datée';return;}
-  const expiry=new Date(ts+SESSION_TTL);
-  el.textContent=`Session expire le : ${expiry.toLocaleString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}`;
+  if(el) el.textContent=KEY?'Session : active (expire à la fermeture de l\'onglet)':'Session : non connecté';
 }
 
 // ── HELPERS ──
