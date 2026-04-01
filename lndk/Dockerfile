@@ -19,12 +19,15 @@ FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y \
     ca-certificates \
+    netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /build/target/release/lndk /usr/local/bin/lndk
 
-RUN chmod +x /usr/local/bin/lndk
+# Startup script: waits for LND before launching LNDK
+COPY startup.sh /usr/local/bin/startup.sh
+RUN chmod +x /usr/local/bin/lndk /usr/local/bin/startup.sh
 
 EXPOSE 10010
 
-ENTRYPOINT ["lndk"]
+ENTRYPOINT ["/usr/local/bin/startup.sh"]

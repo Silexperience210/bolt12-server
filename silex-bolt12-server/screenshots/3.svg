@@ -1,0 +1,203 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#050510"/>
+      <stop offset="100%" style="stop-color:#0a0520"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#8b5cf6"/>
+      <stop offset="50%" style="stop-color:#f59e0b"/>
+      <stop offset="100%" style="stop-color:#22d3ee"/>
+    </linearGradient>
+    <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e0a4e"/>
+      <stop offset="100%" style="stop-color:#0d0628"/>
+    </linearGradient>
+    <linearGradient id="barSent" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#8b5cf6"/>
+      <stop offset="100%" style="stop-color:#5b21b6"/>
+    </linearGradient>
+    <linearGradient id="barRecv" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#10b981"/>
+      <stop offset="100%" style="stop-color:#059669"/>
+    </linearGradient>
+    <filter id="blur1"><feGaussianBlur stdDeviation="70"/></filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1280" height="720" fill="url(#bg)"/>
+  <ellipse cx="200" cy="150" rx="450" ry="300" fill="rgba(139,92,246,0.11)" filter="url(#blur1)"/>
+  <ellipse cx="1100" cy="600" rx="380" ry="270" fill="rgba(16,185,129,0.07)" filter="url(#blur1)"/>
+
+  <!-- Header -->
+  <rect x="0" y="0" width="1280" height="80" fill="rgba(5,5,16,0.8)"/>
+  <rect x="0" y="79" width="1280" height="1" fill="rgba(139,92,246,0.18)"/>
+  <rect x="32" y="18" width="44" height="44" rx="12" fill="url(#logoGrad)" stroke="rgba(139,92,246,0.4)" stroke-width="1"/>
+  <polygon points="56,28 48,44 54,44 46,60 62,42 56,42 62,28" fill="#f59e0b"/>
+  <text x="86" y="37" font-family="-apple-system,sans-serif" font-size="17" font-weight="800" fill="url(#accent)">BOLT12 Server</text>
+  <text x="86" y="53" font-family="-apple-system,sans-serif" font-size="11" fill="#6b6b8a">Lightning Node Dashboard</text>
+
+  <!-- Stats tab active -->
+  <rect x="32" y="96" width="1216" height="50" rx="14" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+  <rect x="38" y="100" width="220" height="42" rx="10" fill="none"/>
+  <text x="148" y="126" font-family="-apple-system,sans-serif" font-size="13" font-weight="600" fill="#6b6b8a" text-anchor="middle">⚡ Offres BOLT12</text>
+  <text x="330" y="126" font-family="-apple-system,sans-serif" font-size="13" font-weight="600" fill="#6b6b8a" text-anchor="middle">💸 Payer</text>
+  <text x="510" y="126" font-family="-apple-system,sans-serif" font-size="13" font-weight="600" fill="#6b6b8a" text-anchor="middle">📋 Historique</text>
+  <rect x="594" y="100" width="200" height="42" rx="10" fill="rgba(139,92,246,0.18)" stroke="rgba(139,92,246,0.3)" stroke-width="1"/>
+  <text x="694" y="126" font-family="-apple-system,sans-serif" font-size="13" font-weight="600" fill="#c4b5fd" text-anchor="middle">📊 Statistiques</text>
+  <text x="870" y="126" font-family="-apple-system,sans-serif" font-size="13" font-weight="600" fill="#6b6b8a" text-anchor="middle">🧾 Templates</text>
+
+  <!-- Totals row -->
+  <rect x="32" y="164" width="280" height="90" rx="16" fill="rgba(255,255,255,0.025)" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+  <text x="52" y="188" font-family="-apple-system,sans-serif" font-size="10" font-weight="700" fill="#6b6b8a" letter-spacing="1">ENVOYÉ (14J)</text>
+  <text x="52" y="225" font-family="-apple-system,sans-serif" font-size="26" font-weight="800" fill="#c4b5fd">47,200</text>
+  <text x="52" y="243" font-family="-apple-system,sans-serif" font-size="11" fill="#6b6b8a">sats · frais: 84 sats</text>
+
+  <rect x="328" y="164" width="280" height="90" rx="16" fill="rgba(255,255,255,0.025)" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+  <text x="348" y="188" font-family="-apple-system,sans-serif" font-size="10" font-weight="700" fill="#6b6b8a" letter-spacing="1">REÇU (14J)</text>
+  <text x="348" y="225" font-family="-apple-system,sans-serif" font-size="26" font-weight="800" fill="#10b981">312,500</text>
+  <text x="348" y="243" font-family="-apple-system,sans-serif" font-size="11" fill="#6b6b8a">sats · 28 paiements</text>
+
+  <rect x="624" y="164" width="280" height="90" rx="16" fill="rgba(255,255,255,0.025)" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+  <text x="644" y="188" font-family="-apple-system,sans-serif" font-size="10" font-weight="700" fill="#6b6b8a" letter-spacing="1">OFFRES ACTIVES</text>
+  <text x="644" y="225" font-family="-apple-system,sans-serif" font-size="26" font-weight="800" fill="#22d3ee">3</text>
+  <text x="644" y="243" font-family="-apple-system,sans-serif" font-size="11" fill="#6b6b8a">offres BOLT12</text>
+
+  <rect x="920" y="164" width="328" height="90" rx="16" fill="rgba(255,255,255,0.025)" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+  <text x="940" y="188" font-family="-apple-system,sans-serif" font-size="10" font-weight="700" fill="#6b6b8a" letter-spacing="1">TRANSACTIONS TOTAL</text>
+  <text x="940" y="225" font-family="-apple-system,sans-serif" font-size="26" font-weight="800" fill="#fde68a">41</text>
+  <text x="940" y="243" font-family="-apple-system,sans-serif" font-size="11" fill="#6b6b8a">envoyés + reçus</text>
+
+  <!-- Chart area -->
+  <rect x="32" y="272" width="780" height="300" rx="18" fill="rgba(255,255,255,0.025)" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+  <text x="52" y="302" font-family="-apple-system,sans-serif" font-size="14" font-weight="700" fill="#f0f0ff">Activité 14 jours</text>
+
+  <!-- Legend -->
+  <rect x="640" y="288" width="10" height="10" rx="2" fill="#8b5cf6"/>
+  <text x="658" y="298" font-family="-apple-system,sans-serif" font-size="11" fill="#6b6b8a">Envoyé</text>
+  <rect x="710" y="288" width="10" height="10" rx="2" fill="#10b981"/>
+  <text x="728" y="298" font-family="-apple-system,sans-serif" font-size="11" fill="#6b6b8a">Reçu</text>
+
+  <!-- Chart grid lines -->
+  <line x1="52" y1="530" x2="792" y2="530" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+  <line x1="52" y1="490" x2="792" y2="490" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+  <line x1="52" y1="450" x2="792" y2="450" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+  <line x1="52" y1="410" x2="792" y2="410" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+  <line x1="52" y1="370" x2="792" y2="370" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+  <line x1="52" y1="330" x2="792" y2="330" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+
+  <!-- Y axis labels -->
+  <text x="45" y="534" font-family="-apple-system,sans-serif" font-size="9" fill="#6b6b8a" text-anchor="end">0</text>
+  <text x="45" y="494" font-family="-apple-system,sans-serif" font-size="9" fill="#6b6b8a" text-anchor="end">10k</text>
+  <text x="45" y="454" font-family="-apple-system,sans-serif" font-size="9" fill="#6b6b8a" text-anchor="end">20k</text>
+  <text x="45" y="414" font-family="-apple-system,sans-serif" font-size="9" fill="#6b6b8a" text-anchor="end">30k</text>
+  <text x="45" y="374" font-family="-apple-system,sans-serif" font-size="9" fill="#6b6b8a" text-anchor="end">40k</text>
+  <text x="45" y="334" font-family="-apple-system,sans-serif" font-size="9" fill="#6b6b8a" text-anchor="end">50k</text>
+
+  <!-- Bars data (14 days) -->
+  <!-- Day bars: sent (purple) + received (green), side by side -->
+  <g transform="translate(52, 0)">
+    <!-- Day 1: small -->
+    <rect x="10" y="510" width="18" height="20" rx="3" fill="url(#barSent)" opacity="0.8"/>
+    <rect x="30" y="505" width="18" height="25" rx="3" fill="url(#barRecv)" opacity="0.8"/>
+    <!-- Day 2: medium -->
+    <rect x="64" y="490" width="18" height="40" rx="3" fill="url(#barSent)" opacity="0.8"/>
+    <rect x="84" y="480" width="18" height="50" rx="3" fill="url(#barRecv)" opacity="0.8"/>
+    <!-- Day 3: none -->
+    <rect x="118" y="525" width="18" height="5" rx="3" fill="url(#barSent)" opacity="0.4"/>
+    <rect x="138" y="520" width="18" height="10" rx="3" fill="url(#barRecv)" opacity="0.4"/>
+    <!-- Day 4: high received -->
+    <rect x="172" y="505" width="18" height="25" rx="3" fill="url(#barSent)" opacity="0.8"/>
+    <rect x="192" y="355" width="18" height="175" rx="3" fill="url(#barRecv)" opacity="0.9"/>
+    <!-- Day 5: medium -->
+    <rect x="226" y="488" width="18" height="42" rx="3" fill="url(#barSent)" opacity="0.8"/>
+    <rect x="246" y="470" width="18" height="60" rx="3" fill="url(#barRecv)" opacity="0.8"/>
+    <!-- Day 6: small -->
+    <rect x="280" y="515" width="18" height="15" rx="3" fill="url(#barSent)" opacity="0.8"/>
+    <rect x="300" y="508" width="18" height="22" rx="3" fill="url(#barRecv)" opacity="0.8"/>
+    <!-- Day 7: zero -->
+    <rect x="334" y="528" width="18" height="2" rx="2" fill="url(#barSent)" opacity="0.3"/>
+    <rect x="354" y="525" width="18" height="5" rx="2" fill="url(#barRecv)" opacity="0.3"/>
+    <!-- Day 8: high sent -->
+    <rect x="388" y="440" width="18" height="90" rx="3" fill="url(#barSent)" opacity="0.9"/>
+    <rect x="408" y="490" width="18" height="40" rx="3" fill="url(#barRecv)" opacity="0.8"/>
+    <!-- Day 9: medium -->
+    <rect x="442" y="493" width="18" height="37" rx="3" fill="url(#barSent)" opacity="0.8"/>
+    <rect x="462" y="475" width="18" height="55" rx="3" fill="url(#barRecv)" opacity="0.8"/>
+    <!-- Day 10: small -->
+    <rect x="496" y="516" width="18" height="14" rx="3" fill="url(#barSent)" opacity="0.8"/>
+    <rect x="516" y="510" width="18" height="20" rx="3" fill="url(#barRecv)" opacity="0.8"/>
+    <!-- Day 11: medium -->
+    <rect x="550" y="488" width="18" height="42" rx="3" fill="url(#barSent)" opacity="0.8"/>
+    <rect x="570" y="478" width="18" height="52" rx="3" fill="url(#barRecv)" opacity="0.8"/>
+    <!-- Day 12: big -->
+    <rect x="604" y="460" width="18" height="70" rx="3" fill="url(#barSent)" opacity="0.9"/>
+    <rect x="624" y="420" width="18" height="110" rx="3" fill="url(#barRecv)" opacity="0.9"/>
+    <!-- Day 13: medium -->
+    <rect x="658" y="492" width="18" height="38" rx="3" fill="url(#barSent)" opacity="0.8"/>
+    <rect x="678" y="483" width="18" height="47" rx="3" fill="url(#barRecv)" opacity="0.8"/>
+    <!-- Day 14 (today): medium-high -->
+    <rect x="712" y="478" width="18" height="52" rx="3" fill="url(#barSent)" opacity="0.8"/>
+    <rect x="732" y="462" width="18" height="68" rx="3" fill="url(#barRecv)" opacity="0.9"/>
+  </g>
+
+  <!-- X axis date labels -->
+  <text x="75" y="548" font-family="-apple-system,sans-serif" font-size="9" fill="#6b6b8a" text-anchor="middle">19 mar</text>
+  <text x="183" y="548" font-family="-apple-system,sans-serif" font-size="9" fill="#6b6b8a" text-anchor="middle">22 mar</text>
+  <text x="291" y="548" font-family="-apple-system,sans-serif" font-size="9" fill="#6b6b8a" text-anchor="middle">25 mar</text>
+  <text x="399" y="548" font-family="-apple-system,sans-serif" font-size="9" fill="#6b6b8a" text-anchor="middle">28 mar</text>
+  <text x="507" y="548" font-family="-apple-system,sans-serif" font-size="9" fill="#6b6b8a" text-anchor="middle">31 mar</text>
+  <text x="615" y="548" font-family="-apple-system,sans-serif" font-size="9" fill="#6b6b8a" text-anchor="middle">03 avr</text>
+  <text x="762" y="548" font-family="-apple-system,sans-serif" font-size="9" fill="#10b981" text-anchor="middle" font-weight="600">aujourd'hui</text>
+
+  <!-- Recent payments panel -->
+  <rect x="828" y="272" width="420" height="420" rx="18" fill="rgba(255,255,255,0.025)" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+  <text x="848" y="302" font-family="-apple-system,sans-serif" font-size="14" font-weight="700" fill="#f0f0ff">Historique récent</text>
+  <rect x="1200" y="285" width="30" height="22" rx="11" fill="rgba(139,92,246,0.15)" stroke="rgba(139,92,246,0.3)" stroke-width="1"/>
+  <text x="1215" y="301" font-family="-apple-system,sans-serif" font-size="10" fill="#c4b5fd" text-anchor="middle">41</text>
+
+  <!-- Payment rows -->
+  <!-- Received -->
+  <rect x="848" y="315" width="380" height="60" rx="10" fill="rgba(16,185,129,0.04)" stroke="rgba(16,185,129,0.1)" stroke-width="1"/>
+  <circle cx="875" cy="345" r="16" fill="rgba(16,185,129,0.12)"/>
+  <text x="875" y="350" font-family="-apple-system,sans-serif" font-size="14" fill="#10b981" text-anchor="middle">↓</text>
+  <text x="900" y="337" font-family="-apple-system,sans-serif" font-size="12" font-weight="600" fill="#f0f0ff">Paiement reçu</text>
+  <text x="900" y="353" font-family="-apple-system,sans-serif" font-size="10" fill="#6b6b8a">5a8b…f2c1 · 14:32</text>
+  <text x="1218" y="340" font-family="-apple-system,sans-serif" font-size="14" font-weight="800" fill="#10b981" text-anchor="end">+50,000</text>
+  <text x="1218" y="356" font-family="-apple-system,sans-serif" font-size="10" fill="#6b6b8a" text-anchor="end">sats</text>
+
+  <!-- Sent -->
+  <rect x="848" y="385" width="380" height="60" rx="10" fill="rgba(248,113,113,0.04)" stroke="rgba(248,113,113,0.1)" stroke-width="1"/>
+  <circle cx="875" cy="415" r="16" fill="rgba(248,113,113,0.12)"/>
+  <text x="875" y="420" font-family="-apple-system,sans-serif" font-size="14" fill="#f87171" text-anchor="middle">↑</text>
+  <text x="900" y="407" font-family="-apple-system,sans-serif" font-size="12" font-weight="600" fill="#f0f0ff">BOLT12</text>
+  <text x="900" y="423" font-family="-apple-system,sans-serif" font-size="10" fill="#6b6b8a">a3b7…9e2f · 11:18</text>
+  <text x="1218" y="410" font-family="-apple-system,sans-serif" font-size="14" font-weight="800" fill="#f87171" text-anchor="end">−5,200</text>
+  <text x="1218" y="426" font-family="-apple-system,sans-serif" font-size="10" fill="#6b6b8a" text-anchor="end">sats · frais: 4</text>
+
+  <!-- Received -->
+  <rect x="848" y="455" width="380" height="60" rx="10" fill="rgba(16,185,129,0.04)" stroke="rgba(16,185,129,0.1)" stroke-width="1"/>
+  <circle cx="875" cy="485" r="16" fill="rgba(16,185,129,0.12)"/>
+  <text x="875" y="490" font-family="-apple-system,sans-serif" font-size="14" fill="#10b981" text-anchor="middle">↓</text>
+  <text x="900" y="477" font-family="-apple-system,sans-serif" font-size="12" font-weight="600" fill="#f0f0ff">Don podcast mensuel</text>
+  <text x="900" y="493" font-family="-apple-system,sans-serif" font-size="10" fill="#6b6b8a">c9d2…3a5e · 09:45</text>
+  <text x="1218" y="480" font-family="-apple-system,sans-serif" font-size="14" font-weight="800" fill="#10b981" text-anchor="end">+5,000</text>
+  <text x="1218" y="496" font-family="-apple-system,sans-serif" font-size="10" fill="#6b6b8a" text-anchor="end">sats</text>
+
+  <!-- Sent -->
+  <rect x="848" y="525" width="380" height="60" rx="10" fill="rgba(248,113,113,0.04)" stroke="rgba(248,113,113,0.1)" stroke-width="1"/>
+  <circle cx="875" cy="555" r="16" fill="rgba(248,113,113,0.12)"/>
+  <text x="875" y="560" font-family="-apple-system,sans-serif" font-size="14" fill="#f87171" text-anchor="middle">↑</text>
+  <text x="900" y="547" font-family="-apple-system,sans-serif" font-size="12" font-weight="600" fill="#f0f0ff">BOLT12</text>
+  <text x="900" y="563" font-family="-apple-system,sans-serif" font-size="10" fill="#6b6b8a">f1e8…7b4c · hier 21:12</text>
+  <text x="1218" y="550" font-family="-apple-system,sans-serif" font-size="14" font-weight="800" fill="#f87171" text-anchor="end">−21,000</text>
+  <text x="1218" y="566" font-family="-apple-system,sans-serif" font-size="10" fill="#6b6b8a" text-anchor="end">sats · frais: 42</text>
+
+  <!-- Export CSV button -->
+  <rect x="848" y="600" width="380" height="44" rx="12" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+  <text x="1038" y="627" font-family="-apple-system,sans-serif" font-size="13" font-weight="600" fill="#6b6b8a" text-anchor="middle">⬇ Exporter CSV</text>
+
+  <!-- Footer -->
+  <rect x="0" y="700" width="1280" height="20" fill="rgba(5,5,16,0.9)"/>
+  <text x="640" y="714" font-family="-apple-system,sans-serif" font-size="10" fill="rgba(107,107,138,0.45)" text-anchor="middle">BOLT12 Server · Statistiques 14 jours · Export CSV disponible</text>
+</svg>

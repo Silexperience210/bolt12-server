@@ -345,7 +345,7 @@ app.get('/health', async (req, res) => {
     res.json({
       status: 'ok',
       service: 'bolt12-offer-server',
-      version: '2.0.0',
+      version: '2.1.0',
       lnd: { connected: true, alias: info.alias, version: info.version },
       lndk: { ready: lndkReady },
     });
@@ -365,7 +365,7 @@ app.get('/api/v1/config', (req, res) => {
   const isLocal = ['127.0.0.1', '::1'].includes(raw) ||
                   ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.');
   if (!isLocal) return res.status(403).json({ success: false, error: 'Forbidden' });
-  res.json({ apiKey: API_KEY, lndkReady, version: '2.0.0' });
+  res.json({ apiKey: API_KEY, lndkReady, version: '2.1.0' });
 });
 
 app.get('/', (req, res) => res.redirect('/dashboard.html'));
@@ -819,6 +819,107 @@ app.patch('/api/v1/webhooks/:id', auth, (req, res) => {
 });
 
 // ============================================
+// LNURL-PAY / LIGHTNING ADDRESS
+// ============================================
+const LNURL_DOMAIN   = process.env.LNURL_DOMAIN   || '';
+const LNURL_USERNAME = process.env.LNURL_USERNAME  || 'pay';
+const LNURL_MIN_MSATS = parseInt(process.env.LNURL_MIN_MSATS || '1000');
+const LNURL_MAX_MSATS = parseInt(process.env.LNURL_MAX_MSATS || '10000000000');
+
+// BIP-353 / RFC-compliant Lightning Address: pay@domain.com
+// Wallets fetch /.well-known/lnurlp/<username> then call the callback
+app.get('/.well-known/lnurlp/:username', async (req, res) => {
+  if (!LNURL_DOMAIN) {
+    return res.status(404).json({
+      status: 'ERROR',
+      reason: 'Lightning Address not configured. Set LNURL_DOMAIN in environment.',
+    });
+  }
+  if (req.params.username !== LNURL_USERNAME) {
+    return res.status(404).json({ status: 'ERROR', reason: 'User not found' });
+  }
+
+  let nodeAlias = 'BOLT12 Server';
+  try {
+    const info = await lndRestGet('/v1/getinfo');
+    nodeAlias = info.alias || nodeAlias;
+  } catch { /* non-fatal */ }
+
+  const metadata = JSON.stringify([
+    ['text/plain',      `Pay ${LNURL_USERNAME}@${LNURL_DOMAIN} · ${nodeAlias}`],
+    ['text/identifier', `${LNURL_USERNAME}@${LNURL_DOMAIN}`],
+  ]);
+
+  res.json({
+    callback:     `https://${LNURL_DOMAIN}/api/v1/lnurl/callback`,
+    maxSendable:  LNURL_MAX_MSATS,
+    minSendable:  LNURL_MIN_MSATS,
+    metadata,
+    tag:          'payRequest',
+    commentAllowed: 120,
+  });
+});
+
+// LNURL-pay callback — wallet sends amount, we return a BOLT11 invoice
+app.get('/api/v1/lnurl/callback', async (req, res) => {
+  if (!LNURL_DOMAIN) {
+    return res.status(404).json({ status: 'ERROR', reason: 'LNURL not configured' });
+  }
+
+  const amount_msats = parseInt(req.query.amount);
+  if (!amount_msats || amount_msats < LNURL_MIN_MSATS || amount_msats > LNURL_MAX_MSATS) {
+    return res.status(400).json({
+      status: 'ERROR',
+      reason: `Amount must be between ${LNURL_MIN_MSATS} and ${LNURL_MAX_MSATS} msats`,
+    });
+  }
+
+  const comment = req.query.comment ? truncate(String(req.query.comment), 120) : '';
+  const amount_sats = Math.floor(amount_msats / 1000);
+
+  // Build the description hash required by the LNURL-pay spec
+  const metadata = JSON.stringify([
+    ['text/plain',      `Pay ${LNURL_USERNAME}@${LNURL_DOMAIN}`],
+    ['text/identifier', `${LNURL_USERNAME}@${LNURL_DOMAIN}`],
+  ]);
+  const descHashBase64 = crypto
+    .createHash('sha256')
+    .update(metadata)
+    .digest('base64');
+
+  try {
+    const data = await lndRestPost('/v1/invoices', {
+      value:            amount_sats,
+      description_hash: descHashBase64,
+      expiry:           3600,
+    });
+
+    if (!data.payment_request) {
+      return res.status(500).json({ status: 'ERROR', reason: 'Failed to generate invoice' });
+    }
+
+    fireWebhooks('lnurl_payment', { amount_sats, comment, domain: LNURL_DOMAIN });
+    res.json({ pr: data.payment_request, routes: [] });
+  } catch (err) {
+    res.status(500).json({ status: 'ERROR', reason: err.message });
+  }
+});
+
+// LNURL config info (dashboard use)
+app.get('/api/v1/lnurl/info', auth, (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      configured:  !!LNURL_DOMAIN,
+      domain:      LNURL_DOMAIN || null,
+      address:     LNURL_DOMAIN ? `${LNURL_USERNAME}@${LNURL_DOMAIN}` : null,
+      minSats:     Math.floor(LNURL_MIN_MSATS / 1000),
+      maxSats:     Math.floor(LNURL_MAX_MSATS / 1000),
+    },
+  });
+});
+
+// ============================================
 // ACCESS LOGS
 // ============================================
 app.get('/api/v1/logs', auth, (req, res) => {
@@ -829,7 +930,7 @@ app.get('/api/v1/logs', auth, (req, res) => {
 // ============================================
 // STARTUP
 // ============================================
-console.log('⚡ Bolt12 Offer Server v2.0.0 (LNDK mode)');
+console.log('⚡ Bolt12 Offer Server v2.1.0 (LNDK mode)');
 console.log('==========================================');
 console.log(`📡 LND REST : ${LND_REST_HOST}`);
 console.log(`⚡ LNDK gRPC: ${LNDK_HOST}`);

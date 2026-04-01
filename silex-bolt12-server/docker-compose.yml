@@ -8,9 +8,13 @@ services:
       PROXY_AUTH_ADD: "false"
 
   lndk:
-    image: ghcr.io/silexperience210/lndk:latest
+    image: ghcr.io/silexperience210/lndk:v0.3.0
     restart: on-failure
     stop_grace_period: 1m
+    environment:
+      # Tells startup.sh which host/port to wait for before launching LNDK
+      LND_WAIT_HOST: "${APP_LIGHTNING_NODE_IP}"
+      LND_WAIT_PORT: "10009"
     volumes:
       - ${APP_LIGHTNING_NODE_DATA_DIR}:/lnd:ro
       - ${APP_DATA_DIR}/lndk-data:/root/.lndk
@@ -21,6 +25,12 @@ services:
       - "--grpc-host=0.0.0.0"
       - "--grpc-port=10010"
       - "--data-dir=/root/.lndk"
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "10010"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
 
   server:
     image: ghcr.io/silexperience210/bolt12-server:latest
@@ -37,7 +47,12 @@ services:
       PORT: "3001"
       LND_TLS_PATH: /lnd/tls.cert
       LND_MACAROON_PATH: /lnd/data/chain/bitcoin/mainnet/admin.macaroon
-      LND_REST_HOST: ${APP_LIGHTNING_NODE_IP}:8080
+      LND_REST_HOST: "${APP_LIGHTNING_NODE_IP}:8080"
       LNDK_HOST: lndk:10010
       LNDK_TLS_PATH: /lndk-data/tls.cert
       LNDK_MACAROON_PATH: /lndk-data/admin.macaroon
+      # Lightning Address (optional — set your public domain to enable)
+      LNURL_DOMAIN: ""
+      LNURL_USERNAME: "pay"
+      LNURL_MIN_MSATS: "1000"
+      LNURL_MAX_MSATS: "10000000000"

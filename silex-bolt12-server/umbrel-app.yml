@@ -2,28 +2,54 @@ manifestVersion: 1.1
 id: silex-bolt12-server
 category: bitcoin
 name: Bolt12 Server
-version: "2.0.0"
-tagline: Accept BOLT12 payments on your Lightning node — LNDK included
+version: "2.1.0"
+tagline: BOLT12 offers + Lightning Address — LNDK bundled, zero config
 icon: https://raw.githubusercontent.com/Silexperience210/bolt12-server/main/silex-bolt12-server/icon.svg
 description: >-
-  Create and manage BOLT12 offers on your Lightning node (LND).
-  Web dashboard with plasma animations, payment history, 14-day stats,
-  BOLT12 invoice decoding, configurable webhooks, CSV export,
-  and auto-generated API key on first start.
-  LNDK is bundled automatically — no separate installation required.
+  Self-hosted BOLT12 Lightning server for your Umbrel node.
+  Create offers, receive payments, track history — LNDK is bundled automatically,
+  no separate installation required.
+
+
+  ── FEATURES ──
+
+  ⚡ BOLT12 Offers — Create reusable payment offers with optional fixed amounts
+
+  💸 Pay & Decode — Pay BOLT12 offers and decode invoices directly from the dashboard
+
+  📊 14-Day Stats — Visual chart of sent/received activity over the last 2 weeks
+
+  📋 Payment History — Full log of sent and received payments with CSV export
+
+  🔗 Shareable Pay Links — Each offer has a public pay page with QR code
+
+  🌐 Lightning Address — Optional: set your domain to enable pay@yourdomain.com (LNURL-pay)
+
+  🔔 Webhooks — HTTP callbacks on payment events (payment_sent, invoice_created)
+
+  🧾 Templates — Save reusable offer presets for quick generation
+
+  🔑 Auto API Key — Generated on first start, accessible on local network only
+
+  🛡 Security-hardened — CSP, X-Frame-Options, atomic file writes, SSRF protection
 
 
   ── PREREQUISITE (one time only) ──
 
-  Before installing, your LND node needs 3 protocol flags enabled for
-  onion messaging (required by BOLT12). This cannot be done automatically.
-
+  Before installing, your LND node needs 3 protocol flags for onion messaging (BOLT12).
   Run this single command via SSH on your Umbrel node:
 
   bash <(curl -s https://raw.githubusercontent.com/Silexperience210/bolt12-server/main/setup-lnd-flags.sh)
 
-  The script will safely add the flags to lnd.conf and restart LND (~30s).
+  This safely adds the flags to lnd.conf and restarts LND (~30s).
   After that, install this app — everything else is fully automatic.
+
+
+  ── LIGHTNING ADDRESS (optional) ──
+
+  To enable pay@yourdomain.com, set LNURL_DOMAIN in the app's environment
+  after installation. Requires a publicly accessible domain with HTTPS.
+
 developer: silexperience210
 website: https://github.com/Silexperience210/bolt12-server
 dependencies:
@@ -31,9 +57,28 @@ dependencies:
 repo: https://github.com/Silexperience210/bolt12-server
 support: https://github.com/Silexperience210/bolt12-server/issues
 port: 3001
-gallery: []
+gallery:
+  - https://raw.githubusercontent.com/Silexperience210/bolt12-server/main/silex-bolt12-server/screenshots/1.svg
+  - https://raw.githubusercontent.com/Silexperience210/bolt12-server/main/silex-bolt12-server/screenshots/2.svg
+  - https://raw.githubusercontent.com/Silexperience210/bolt12-server/main/silex-bolt12-server/screenshots/3.svg
 path: ""
 defaultUsername: ""
 defaultPassword: ""
 submitter: silexperience210
 submission: https://github.com/Silexperience210/bolt12-server
+releaseNotes: >-
+  v2.1.0 — Major hardening + Lightning Address support
+
+  New features:
+  - Lightning Address / LNURL-pay (optional, set LNURL_DOMAIN to activate)
+  - LNDK version pinned to v0.3.0 (stable, no surprise breakages from updates)
+  - LNDK now waits for LND before starting (no more failed boot races)
+  - LNDK healthcheck built into Docker Compose
+
+  Security improvements:
+  - Full CSP + security headers on all responses
+  - Atomic JSON file writes (no corruption on power loss)
+  - SSRF protection on webhook URLs
+  - API key moved to sessionStorage (clears on tab close)
+  - JS libraries self-hosted at build time (no CDN at runtime)
+  - BigInt validation on all Lightning amounts

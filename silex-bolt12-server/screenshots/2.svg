@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#050510"/>
+      <stop offset="100%" style="stop-color:#0a0520"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#8b5cf6"/>
+      <stop offset="50%" style="stop-color:#f59e0b"/>
+      <stop offset="100%" style="stop-color:#22d3ee"/>
+    </linearGradient>
+    <linearGradient id="btnGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8b5cf6"/>
+      <stop offset="100%" style="stop-color:#5b21b6"/>
+    </linearGradient>
+    <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e0a4e"/>
+      <stop offset="100%" style="stop-color:#0d0628"/>
+    </linearGradient>
+    <filter id="blur1"><feGaussianBlur stdDeviation="70"/></filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1280" height="720" fill="url(#bg)"/>
+  <ellipse cx="150" cy="200" rx="450" ry="320" fill="rgba(139,92,246,0.12)" filter="url(#blur1)"/>
+  <ellipse cx="1200" cy="550" rx="380" ry="270" fill="rgba(245,158,11,0.07)" filter="url(#blur1)"/>
+
+  <!-- Header -->
+  <rect x="0" y="0" width="1280" height="80" fill="rgba(5,5,16,0.8)"/>
+  <rect x="0" y="79" width="1280" height="1" fill="rgba(139,92,246,0.18)"/>
+  <rect x="32" y="18" width="44" height="44" rx="12" fill="url(#logoGrad)" stroke="rgba(139,92,246,0.4)" stroke-width="1"/>
+  <polygon points="56,28 48,44 54,44 46,60 62,42 56,42 62,28" fill="#f59e0b"/>
+  <text x="86" y="37" font-family="-apple-system,sans-serif" font-size="17" font-weight="800" fill="url(#accent)">BOLT12 Server</text>
+  <text x="86" y="53" font-family="-apple-system,sans-serif" font-size="11" fill="#6b6b8a">Lightning Node Dashboard</text>
+
+  <!-- Page title -->
+  <text x="640" y="110" font-family="-apple-system,sans-serif" font-size="20" font-weight="800" fill="#f0f0ff" text-anchor="middle">Offer créée avec succès</text>
+  <text x="640" y="132" font-family="-apple-system,sans-serif" font-size="13" fill="#6b6b8a" text-anchor="middle">Partagez ce QR code ou l'identifiant BOLT12 pour recevoir des paiements</text>
+
+  <!-- Result card -->
+  <rect x="200" y="155" width="880" height="520" rx="22" fill="rgba(255,255,255,0.025)" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+  <rect x="200" y="155" width="880" height="3" rx="1.5" fill="url(#accent)"/>
+
+  <!-- Green success bar -->
+  <rect x="220" y="175" width="840" height="50" rx="12" fill="rgba(16,185,129,0.08)" stroke="rgba(16,185,129,0.25)" stroke-width="1"/>
+  <circle cx="248" cy="200" r="10" fill="rgba(16,185,129,0.2)" stroke="rgba(16,185,129,0.5)" stroke-width="1"/>
+  <text x="248" y="205" font-family="-apple-system,sans-serif" font-size="12" fill="#10b981" text-anchor="middle">✓</text>
+  <text x="270" y="198" font-family="-apple-system,sans-serif" font-size="13" font-weight="600" fill="#10b981">Offer BOLT12 générée</text>
+  <text x="270" y="215" font-family="-apple-system,sans-serif" font-size="11" fill="#6b6b8a">Votre identifiant unique : <tspan font-family="monospace" fill="rgba(196,181,253,0.8)"># a3f2b91c4e8d7f2b</tspan></text>
+
+  <!-- Offer info -->
+  <text x="640" y="262" font-family="-apple-system,sans-serif" font-size="22" font-weight="800" fill="#f0f0ff" text-anchor="middle">Don podcast mensuel</text>
+  <rect x="530" y="274" width="220" height="34" rx="17" fill="rgba(245,158,11,0.1)" stroke="rgba(245,158,11,0.3)" stroke-width="1"/>
+  <text x="640" y="297" font-family="-apple-system,sans-serif" font-size="15" font-weight="800" fill="#fde68a" text-anchor="middle">⚡ 5,000 sats</text>
+
+  <!-- QR code (simulated grid) -->
+  <rect x="490" y="322" width="300" height="300" rx="16" fill="white" stroke="rgba(139,92,246,0.3)" stroke-width="2"/>
+  <!-- QR code pattern simulation -->
+  <g transform="translate(505,337)">
+    <!-- Position detection patterns (corners) -->
+    <rect x="0" y="0" width="56" height="56" rx="4" fill="#1a0a3e"/>
+    <rect x="8" y="8" width="40" height="40" rx="2" fill="white"/>
+    <rect x="16" y="16" width="24" height="24" rx="1" fill="#1a0a3e"/>
+
+    <rect x="214" y="0" width="56" height="56" rx="4" fill="#1a0a3e"/>
+    <rect x="222" y="8" width="40" height="40" rx="2" fill="white"/>
+    <rect x="230" y="16" width="24" height="24" rx="1" fill="#1a0a3e"/>
+
+    <rect x="0" y="214" width="56" height="56" rx="4" fill="#1a0a3e"/>
+    <rect x="8" y="222" width="40" height="40" rx="2" fill="white"/>
+    <rect x="16" y="230" width="24" height="24" rx="1" fill="#1a0a3e"/>
+
+    <!-- Lightning bolt watermark in center -->
+    <polygon points="148,105 130,145 143,145 125,185 165,138 152,138 165,105" fill="rgba(245,158,11,0.25)" stroke="rgba(245,158,11,0.4)" stroke-width="1"/>
+
+    <!-- Random data pattern -->
+    <rect x="80" y="8" width="8" height="8" fill="#1a0a3e"/>
+    <rect x="96" y="8" width="8" height="8" fill="#1a0a3e"/>
+    <rect x="112" y="8" width="8" height="8" fill="#1a0a3e"/>
+    <rect x="128" y="8" width="8" height="8" fill="#1a0a3e"/>
+    <rect x="88" y="24" width="8" height="8" fill="#1a0a3e"/>
+    <rect x="104" y="24" width="8" height="8" fill="#1a0a3e"/>
+    <rect x="120" y="24" width="8" height="8" fill="#1a0a3e"/>
+    <rect x="80" y="40" width="8" height="8" fill="#1a0a3e"/>
+    <rect x="112" y="40" width="8" height="8" fill="#1a0a3e"/>
+    <rect x="128" y="40" width="8" height="8" fill="#1a0a3e"/>
+
+    <rect x="8" y="80" width="8" height="8" fill="#1a0a3e"/>
+    <rect x="24" y="80" width="8" height="8" fill="#1a0a3e"/>
+    <rect x="8" y="96" width="8" height="8" fill="#1a0a3e"/>
+    <rect x="40" y="96" width="8" height="8" fill="#1a0a3e"/>
+    <rect x="80" y="80" width="8" height="8" fill="#1a0a3e"/>
+    <rect x="104" y="80" width="8" height="8" fill="#1a0a3e"/>
+    <rect x="128" y="80" width="8" height="8" fill="#1a0a3e"/>
+    <rect x="160" y="80" width="8" height="8" fill="#1a0a3e"/>
+    <rect x="192" y="80" width="8" height="8" fill="#1a0a3e"/>
+    <rect x="216" y="80" width="8" height="8" fill="#1a0a3e"/>
+
+    <rect x="240" y="80" width="8" height="8" fill="#1a0a3e"/>
+    <rect x="240" y="96" width="8" height="8" fill="#1a0a3e"/>
+    <rect x="256" y="80" width="8" height="8" fill="#1a0a3e"/>
+    <rect x="256" y="96" width="8" height="8" fill="#1a0a3e"/>
+  </g>
+
+  <!-- Offer string -->
+  <rect x="220" y="638" width="840" height="22" rx="6" fill="rgba(0,0,0,0.4)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+  <text x="240" y="653" font-family="monospace" font-size="10" fill="rgba(196,181,253,0.6)">lno1qgsyxjtl6luzd9t3pr62xr7eemp6awnejusgd97ek8w84mwdamvuvxjans8xc5kzen9wgs...</text>
+
+  <!-- Action buttons -->
+  <rect x="220" y="670" width="270" height="44" rx="12" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+  <text x="355" y="697" font-family="-apple-system,sans-serif" font-size="13" font-weight="600" fill="#6b6b8a" text-anchor="middle">📋 Copier l'offer</text>
+
+  <rect x="505" y="670" width="270" height="44" rx="12" fill="rgba(139,92,246,0.1)" stroke="rgba(139,92,246,0.3)" stroke-width="1"/>
+  <text x="640" y="697" font-family="-apple-system,sans-serif" font-size="13" font-weight="600" fill="#c4b5fd" text-anchor="middle">🔗 Partager le lien</text>
+
+  <rect x="790" y="670" width="270" height="44" rx="12" fill="rgba(245,158,11,0.1)" stroke="rgba(245,158,11,0.3)" stroke-width="1"/>
+  <text x="925" y="697" font-family="-apple-system,sans-serif" font-size="13" font-weight="600" fill="#fde68a" text-anchor="middle">⬇ Télécharger QR</text>
+</svg>
