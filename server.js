@@ -508,6 +508,7 @@ function checkLndBolt12Flags() {
     '/lnd/lnd.conf',
   ];
   const settingsPaths = [
+    '/lightning/settings.json',
     '/lnd/lightning/settings.json',
     '/lnd/data/lightning/settings.json',
   ];

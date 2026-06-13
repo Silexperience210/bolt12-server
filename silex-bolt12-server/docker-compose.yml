@@ -49,6 +49,8 @@ services:
         condition: service_healthy
     volumes:
       - ${APP_LIGHTNING_NODE_DATA_DIR}:/lnd:ro
+      # UmbrelOS 1.x stores Lightning settings.json next to the lnd data dir.
+      - ${APP_LIGHTNING_NODE_DATA_DIR}/../lightning:/lightning:ro
       # The server only reads LNDK's TLS cert and macaroon; LNDK itself writes them.
       - lndk-data:/lndk-data:ro
       # Named volume avoids UID/GID permission issues with the node user.
