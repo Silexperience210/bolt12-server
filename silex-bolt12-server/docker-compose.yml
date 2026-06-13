@@ -11,6 +11,8 @@ services:
 
   lndk:
     image: ghcr.io/silexperience210/lndk:v0.3.0
+    # Run as root so LNDK can write to the named volume regardless of host UID.
+    user: root
     restart: unless-stopped
     stop_grace_period: 1m
     environment:
