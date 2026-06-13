@@ -1,6 +1,6 @@
 {
   "name": "bolt12-offer-server",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "API REST pour générer des offers Bolt12 avec LND",
   "main": "server.js",
   "scripts": {
@@ -13,7 +13,9 @@
     "dotenv": "^16.3.1",
     "@grpc/grpc-js": "^1.9.0",
     "@grpc/proto-loader": "^0.7.8",
-    "express-rate-limit": "^7.1.0"
+    "express-rate-limit": "^7.1.0",
+    "qrcode": "^1.5.3",
+    "ipaddr.js": "^2.2.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"

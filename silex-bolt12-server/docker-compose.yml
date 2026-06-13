@@ -3,28 +3,31 @@ version: "3.7"
 services:
   app_proxy:
     environment:
-      APP_HOST: silex-bolt12-server_server_1
+      # Use the Compose service name instead of the hardcoded container name.
+      APP_HOST: server
       APP_PORT: 3001
       PROXY_AUTH_ADD: "false"
+    restart: unless-stopped
 
   lndk:
     image: ghcr.io/silexperience210/lndk:v0.3.0
-    restart: on-failure
+    restart: unless-stopped
     stop_grace_period: 1m
     environment:
       # Tells startup.sh which host/port to wait for before launching LNDK
       LND_WAIT_HOST: "${APP_LIGHTNING_NODE_IP}"
       LND_WAIT_PORT: "10009"
+      LND_WAIT_TIMEOUT: "180"
     volumes:
       - ${APP_LIGHTNING_NODE_DATA_DIR}:/lnd:ro
-      - ${APP_DATA_DIR}/lndk-data:/root/.lndk
+      - ${APP_DATA_DIR}/lndk-data:/home/lndk/.lndk
     command:
       - "--address=https://${APP_LIGHTNING_NODE_IP}:10009"
       - "--cert-path=/lnd/tls.cert"
       - "--macaroon-path=/lnd/data/chain/bitcoin/mainnet/admin.macaroon"
       - "--grpc-host=0.0.0.0"
       - "--grpc-port=10010"
-      - "--data-dir=/root/.lndk"
+      - "--data-dir=/home/lndk/.lndk"
     healthcheck:
       test: ["CMD", "nc", "-z", "localhost", "10010"]
       interval: 15s
@@ -34,12 +37,13 @@ services:
 
   server:
     image: ghcr.io/silexperience210/bolt12-server:latest
-    restart: on-failure
+    restart: unless-stopped
     stop_grace_period: 1m
     depends_on:
       - lndk
     volumes:
       - ${APP_LIGHTNING_NODE_DATA_DIR}:/lnd:ro
+      # The server only reads LNDK's TLS cert and macaroon; LNDK itself writes them.
       - ${APP_DATA_DIR}/lndk-data:/lndk-data:ro
       - ${APP_DATA_DIR}/data:/app/data
     environment:
@@ -56,3 +60,9 @@ services:
       LNURL_USERNAME: "pay"
       LNURL_MIN_MSATS: "1000"
       LNURL_MAX_MSATS: "10000000000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s

@@ -5,8 +5,9 @@ set -e
 cd ~/bolt12-server
 
 if [ ! -f .env ]; then
+    # Prefer node's crypto RNG (256 bits of entropy); fall back to /dev/urandom.
     API_KEY=$(node -e "const c=require('crypto'); console.log(c.randomBytes(32).toString('hex'))" 2>/dev/null \
-              || cat /proc/sys/kernel/random/uuid | tr -d -)
+              || head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')
     cat > .env << ENVEOF
 NODE_ENV=production
 PORT=3001
@@ -26,9 +27,10 @@ else
 fi
 
 echo ""
-echo "[Docker] Build et demarrage..."
+echo "[Docker] Pull et demarrage..."
 docker compose down 2>/dev/null || true
-docker compose up --build -d
+docker compose pull
+docker compose up -d
 
 echo ""
 echo "[OK] Conteneur lance"

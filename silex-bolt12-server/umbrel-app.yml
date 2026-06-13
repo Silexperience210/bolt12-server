@@ -2,7 +2,7 @@ manifestVersion: 1.1
 id: silex-bolt12-server
 category: bitcoin
 name: Bolt12 Server
-version: "2.1.0"
+version: "2.2.0"
 tagline: BOLT12 offers + Lightning Address — LNDK bundled, zero config
 icon: https://raw.githubusercontent.com/Silexperience210/bolt12-server/main/silex-bolt12-server/icon.svg
 description: >-
@@ -67,7 +67,24 @@ defaultPassword: ""
 submitter: silexperience210
 submission: https://github.com/Silexperience210/bolt12-server
 releaseNotes: >-
-  v2.1.0 — Major hardening + Lightning Address support
+  v2.2.0 — Security & robustness hardening
+
+  Security improvements:
+  - API key comparison is now timing-safe
+  - /api/v1/config is restricted to local network connections only
+  - LNDK TLS certificate is now mandatory (no insecure fallback)
+  - API key file is created with 0o600 permissions
+  - Webhook SSRF protection now blocks all private CIDRs, DNS rebinding and IP alternatives
+  - QR codes are generated server-side (no external service)
+  - Frontend XSS vectors removed (DOM-based rendering, no inline JS attributes)
+  - CSV export is protected against spreadsheet injection
+
+  Robustness improvements:
+  - JSON file reads/writes are serialized with per-file mutexes
+  - All LND REST calls now have timeouts and HTTP status checks
+  - BigInt amounts are properly serialized as strings for gRPC
+  - Docker image runs as non-root user with healthcheck
+  - Deploy script and LNDK startup are more reliable
 
   New features:
   - Lightning Address / LNURL-pay (optional, set LNURL_DOMAIN to activate)

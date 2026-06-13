@@ -757,7 +757,7 @@ textarea.inp{resize:vertical;min-height:80px;line-height:1.5}
       </div>
       <div class="session-info" id="session-info">
         <p id="session-expiry">Session : —</p>
-        <small>La session expire 48h après la dernière connexion.</small>
+        <small>La session est stockée dans sessionStorage et expire à la fermeture de l'onglet.</small>
       </div>
       <div class="btn-row">
         <button class="btn btn-g" onclick="showAuth()" style="font-size:13px;padding:9px 14px">Voir / changer la clé API</button>
@@ -1082,9 +1082,11 @@ async function init(){
 
 // ── OFFERS ──
 async function createOffer(){
+  const MAX_SATS = 21_000_000 * 100_000_000; // 21M BTC
   const amount=parseInt(document.getElementById('o-amount').value)||0;
   const desc=document.getElementById('o-desc').value.trim();
   if(!desc){toast('Description obligatoire','err');return;}
+  if(amount<0||amount>MAX_SATS){toast(`Montant invalide (max ${fmt(MAX_SATS)} sats)`,'err');return;}
   const issuer=document.getElementById('o-issuer').value.trim();
   const expiry=parseInt(document.getElementById('o-expiry').value)||0;
   const quantity=parseInt(document.getElementById('o-quantity').value)||0;
@@ -1121,29 +1123,45 @@ async function loadOffers(){
   try{
     const d=await api('/offers');const os=d.data||[];
     document.getElementById('offers-count').textContent=os.length;
-    if(!os.length){list.innerHTML=empty('Aucune offer active','Créez votre première offer ci-dessus');return;}
-    list.innerHTML=os.map((o,i)=>`
-      <div class="offer-row" style="animation-delay:${i*.05}s">
-        <div class="offer-main">
-          <div class="offer-desc">${esc(o.description||'Sans description')}</div>
-          <div class="offer-code">${esc(o.offer||'')}</div>
-          <div class="offer-meta"><span># ${esc(o.id||'')}</span>${o.createdAt?`<span>${fmtDate(o.createdAt)}</span>`:''}</div>
-        </div>
-        <div class="offer-actions">
-          <button class="btn btn-g" style="padding:5px 11px;font-size:11px;gap:4px" onclick="copyStr('${esc(o.offer||'')}')">
-            <svg viewBox="0 0 20 20" fill="currentColor" style="width:11px;height:11px"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"/><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"/></svg>
-            Copier
-          </button>
-          <button class="btn btn-cyan" style="padding:5px 11px;font-size:11px;gap:4px" onclick="shareOffer('${esc(o.id||'')}')">
-            <svg viewBox="0 0 20 20" fill="currentColor" style="width:11px;height:11px"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z"/></svg>
-            Partager
-          </button>
-          <button class="btn btn-red" style="padding:5px 11px;font-size:11px" onclick="delOffer('${esc(o.id||'')}')">Suppr.</button>
-        </div>
-        <div>
-          <div class="offer-amt">${o.amount>0?fmt(o.amount):'∞'}<small>${o.amount>0?'sats':'libre'}</small></div>
-        </div>
-      </div>`).join('');
+    if(!os.length){list.innerHTML=empty('Aucune offer active','Créez votre premi&egrave;re offer ci-dessus');return;}
+    const frag=document.createDocumentFragment();
+    os.forEach((o,i)=>{
+      const row=document.createElement('div');row.className='offer-row';row.style.animationDelay=(i*.05)+'s';
+
+      const main=document.createElement('div');main.className='offer-main';
+      const descEl=document.createElement('div');descEl.className='offer-desc';descEl.textContent=o.description||'Sans description';
+      const codeEl=document.createElement('div');codeEl.className='offer-code';codeEl.textContent=o.offer||'';
+      const metaEl=document.createElement('div');metaEl.className='offer-meta';
+      const idSpan=document.createElement('span');idSpan.textContent='# '+(o.id||'');
+      metaEl.appendChild(idSpan);
+      if(o.createdAt){
+        const dateSpan=document.createElement('span');dateSpan.textContent=fmtDate(o.createdAt);
+        metaEl.appendChild(dateSpan);
+      }
+      main.append(descEl,codeEl,metaEl);
+
+      const actions=document.createElement('div');actions.className='offer-actions';
+      const copyBtn=document.createElement('button');copyBtn.className='btn btn-g';copyBtn.style.cssText='padding:5px 11px;font-size:11px;gap:4px';
+      copyBtn.innerHTML='<svg viewBox="0 0 20 20" fill="currentColor" style="width:11px;height:11px"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"/><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"/></svg> Copier';
+      copyBtn.addEventListener('click',()=>copyStr(o.offer||''));
+      const shareBtn=document.createElement('button');shareBtn.className='btn btn-cyan';shareBtn.style.cssText='padding:5px 11px;font-size:11px;gap:4px';
+      shareBtn.innerHTML='<svg viewBox="0 0 20 20" fill="currentColor" style="width:11px;height:11px"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z"/></svg> Partager';
+      shareBtn.addEventListener('click',()=>shareOffer(o.id||''));
+      const delBtn=document.createElement('button');delBtn.className='btn btn-red';delBtn.style.cssText='padding:5px 11px;font-size:11px';
+      delBtn.textContent='Suppr.';
+      delBtn.addEventListener('click',()=>delOffer(o.id||''));
+      actions.append(copyBtn,shareBtn,delBtn);
+
+      const amtWrap=document.createElement('div');
+      const amtEl=document.createElement('div');amtEl.className='offer-amt';
+      amtEl.textContent=(o.amount>0?fmt(o.amount):'∞');
+      const small=document.createElement('small');small.textContent=o.amount>0?'sats':'libre';
+      amtEl.appendChild(small);amtWrap.appendChild(amtEl);
+
+      row.append(main,actions,amtWrap);
+      frag.appendChild(row);
+    });
+    list.innerHTML='';list.appendChild(frag);
   }catch(e){list.innerHTML=`<div style="text-align:center;padding:30px;font-size:13px;color:var(--red)">${esc(e.message)}</div>`;}
 }
 async function delOffer(id){if(!confirm('Désactiver cette offer ?'))return;try{await api(`/offers/${id}`,{method:'DELETE'});toast('🗑 Offer supprimée');loadOffers();}catch(e){toast(e.message,'err');}}
@@ -1452,15 +1470,36 @@ async function loadWebhooks(){
   try{
     const {data:whs}=await api('/webhooks');
     if(!whs||!whs.length){list.innerHTML=`<div style="text-align:center;padding:20px;font-size:13px;color:var(--muted)">Aucun webhook configuré</div>`;return;}
-    list.innerHTML=whs.map(w=>`
-      <div class="wh-row" id="whr-${esc(w.id||'')}">
-        <div class="wh-info">
-          <div class="wh-url" style="opacity:${w.active===false?.4:1}">${esc(w.url)}</div>
-          <div class="wh-events">Événement : <strong style="color:var(--pL)">${esc(w.event||'*')}</strong>${w.active===false?' · <span style="color:var(--red)">inactif</span>':''}</div>
-        </div>
-        <button class="btn" style="padding:5px 11px;font-size:11px;white-space:nowrap;background:${w.active===false?'rgba(80,200,120,.15)':'rgba(255,180,50,.12)'};color:${w.active===false?'var(--green)':'var(--yellow)'}" onclick="toggleWebhook('${esc(w.id||'')}',${w.active===false})">&#x23F8;</button>
-        <button class="btn btn-red" style="padding:5px 11px;font-size:11px;white-space:nowrap" onclick="delWebhook('${esc(w.id||'')}')">Suppr.</button>
-      </div>`).join('');
+    const frag=document.createDocumentFragment();
+    whs.forEach(w=>{
+      const row=document.createElement('div');row.className='wh-row';row.id='whr-'+(w.id||'');
+      const info=document.createElement('div');info.className='wh-info';
+      const urlEl=document.createElement('div');urlEl.className='wh-url';urlEl.style.opacity=w.active===false?0.4:1;urlEl.textContent=w.url||'';
+      const eventsEl=document.createElement('div');eventsEl.className='wh-events';
+      eventsEl.appendChild(document.createTextNode('Événement : '));
+      const strong=document.createElement('strong');strong.style.color='var(--pL)';strong.textContent=w.event||'*';
+      eventsEl.appendChild(strong);
+      if(w.active===false){
+        eventsEl.appendChild(document.createTextNode(' · '));
+        const span=document.createElement('span');span.style.color='var(--red)';span.textContent='inactif';
+        eventsEl.appendChild(span);
+      }
+      info.append(urlEl,eventsEl);
+
+      const toggleBtn=document.createElement('button');toggleBtn.className='btn';toggleBtn.style.cssText='padding:5px 11px;font-size:11px;white-space:nowrap';
+      const makeActive=w.active===false;
+      toggleBtn.style.background=makeActive?'rgba(80,200,120,.15)':'rgba(255,180,50,.12)';
+      toggleBtn.style.color=makeActive?'var(--green)':'var(--yellow)';
+      toggleBtn.innerHTML='&#x23F8;';
+      toggleBtn.addEventListener('click',()=>toggleWebhook(w.id||'',makeActive));
+      const delBtn=document.createElement('button');delBtn.className='btn btn-red';delBtn.style.cssText='padding:5px 11px;font-size:11px;white-space:nowrap';
+      delBtn.textContent='Suppr.';
+      delBtn.addEventListener('click',()=>delWebhook(w.id||''));
+
+      row.append(info,toggleBtn,delBtn);
+      frag.appendChild(row);
+    });
+    list.innerHTML='';list.appendChild(frag);
   }catch(e){list.innerHTML=`<div style="text-align:center;padding:20px;font-size:13px;color:var(--red)">${esc(e.message)}</div>`;}
 }
 async function addWebhook(){

@@ -28,6 +28,12 @@ fi
 echo -e "${YELLOW}Found lnd.conf at: $LND_CONF${NC}"
 echo ""
 
+# Backup lnd.conf before any modification
+BACKUP_FILE="${LND_CONF}.bak.$(date +%Y%m%d%H%M%S)"
+cp "$LND_CONF" "$BACKUP_FILE"
+echo -e "${GREEN}Backup created: ${BACKUP_FILE}${NC}"
+echo ""
+
 # Add [protocol] section if missing
 if ! grep -q "^\[protocol\]" "$LND_CONF"; then
     echo "" >> "$LND_CONF"
@@ -44,8 +50,8 @@ FLAGS=(
 
 for FLAG in "${FLAGS[@]}"; do
     KEY="${FLAG%%=*}"
-    if grep -q "^$KEY" "$LND_CONF"; then
-        echo -e "${GREEN}Already set: $FLAG${NC}"
+    if grep -q "^${KEY}=" "$LND_CONF"; then
+        echo -e "${YELLOW}Already set: $FLAG${NC}"
     else
         sed -i "/^\[protocol\]/a $FLAG" "$LND_CONF"
         echo -e "${GREEN}Added: $FLAG${NC}"

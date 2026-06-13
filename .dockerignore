@@ -1,0 +1,12 @@
+.git
+node_modules
+data
+.env
+.env.*
+*.md
+.github
+.tmp
+.nvmrc
+test.js
+deploy-umbrel.sh
+setup-*.sh

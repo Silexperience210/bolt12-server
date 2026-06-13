@@ -375,7 +375,14 @@ function showOffer(o){
   }
 
   // Wallet link
-  document.getElementById('wallet-btn').href=`lightning:${_offerStr}`;
+  const walletBtn=document.getElementById('wallet-btn');
+  if(_offerStr.startsWith('lno1')){
+    walletBtn.href=`lightning:${_offerStr}`;
+    walletBtn.style.pointerEvents='';
+  }else{
+    walletBtn.href='#';
+    walletBtn.style.pointerEvents='none';
+  }
 
   document.getElementById('state-offer').style.display='';
 }
@@ -387,15 +394,20 @@ async function loadOffer(){
     showError('Paramètre manquant','Aucun identifiant d\'offer fourni dans l\'URL.');
     return;
   }
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),10000);
   try{
-    const r=await fetch(`/api/v1/public/offers/${encodeURIComponent(id)}`);
+    const r=await fetch(`/api/v1/public/offers/${encodeURIComponent(id)}`,{signal:controller.signal});
+    clearTimeout(timeout);
     if(r.status===404){showError('Offer introuvable','Cette offer n\'existe pas ou a été désactivée.');return;}
     if(!r.ok){showError('Erreur serveur',`HTTP ${r.status}`);return;}
     const d=await r.json();
     if(!d.success||!d.data){showError('Données invalides','La réponse du serveur est invalide.');return;}
     showOffer(d.data);
   }catch(e){
-    showError('Connexion impossible','Impossible de contacter le serveur BOLT12.');
+    clearTimeout(timeout);
+    if(e.name==='AbortError') showError('Délai dépassé','Le serveur met trop de temps à répondre.');
+    else showError('Connexion impossible','Impossible de contacter le serveur BOLT12.');
   }
 }
 
