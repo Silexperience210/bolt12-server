@@ -1608,6 +1608,7 @@ async function loadDiagnostic(){
       if(!d.lnd.uris||!d.lnd.uris.length) issues.push('LND n\'annonce aucune adresse externe (Tor/IP). BOLT12 nécessite d\'être joignable.');
       if(!d.lnd.num_peers) issues.push('LND n\'a aucun peer connecté. Il faut au moins un peer pour relayer les onion messages.');
       if(!d.lnd.num_active_channels) issues.push('LND n\'a aucun canal actif. Les paiements Lightning ne peuvent pas aboutir sans liquidité.');
+      if(d.lnd.num_active_channels && !d.lnd.num_public_channels) issues.push('LND n\'a aucun canal PUBLIC. BOLT12 a besoin d\'au moins un canal annoncé pour construire un chemin aveugle (blinded path).');
       if(d.lnd.uris&&d.lnd.uris.length) ok.push(`Adresses annoncées : ${d.lnd.uris.join(', ')}`);
       ok.push(`Peers : ${d.lnd.num_peers||0} · Canaux actifs : ${d.lnd.num_active_channels||0}`);
       ok.push(`Version LND : ${d.lnd.version||'?'} · Alias : ${d.lnd.alias||'?'}`);

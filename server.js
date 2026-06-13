@@ -551,8 +551,13 @@ function checkLndBolt12Flags() {
 
 app.get('/api/v1/diagnostic', auth, async (req, res) => {
   try {
-    const info = await lndRestGet('/v1/getinfo');
+    const [info, channels] = await Promise.all([
+      lndRestGet('/v1/getinfo'),
+      lndRestGet('/v1/channels').catch(() => ({ channels: [] })),
+    ]);
     const flags = checkLndBolt12Flags();
+    const chans = Array.isArray(channels.channels) ? channels.channels : [];
+    const publicChannels = chans.filter(c => c.private === false);
     res.json({
       success: true,
       lnd: {
@@ -564,6 +569,7 @@ app.get('/api/v1/diagnostic', auth, async (req, res) => {
         uris: info.uris || [],
         num_peers: info.num_peers,
         num_active_channels: info.num_active_channels,
+        num_public_channels: publicChannels.length,
         num_pending_channels: info.num_pending_channels,
         features: info.features,
       },
