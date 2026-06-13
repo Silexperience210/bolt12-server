@@ -76,7 +76,7 @@ LND_MACAROON_PATH=/lnd/data/chain/bitcoin/mainnet/admin.macaroon
 
 # LNDK
 LNDK_HOST=host.docker.internal:10010
-LNDK_TLS_PATH=/lndk-data/tls.cert
+LNDK_TLS_PATH=/lndk-data/tls-cert.pem
 LNDK_MACAROON_PATH=/lndk-data/admin.macaroon
 
 # API Key (keep secret!)
@@ -93,7 +93,7 @@ ssh "${UMBREL_USER}@${UMBREL_IP}" "
     cd ${REMOTE_DIR}
     docker compose down 2>/dev/null || true
     docker compose pull
-    docker compose up -d
+    docker compose up -d --build
 "
 
 # ---- Vérification ----

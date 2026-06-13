@@ -14,6 +14,8 @@ const crypto  = require('crypto');
 const QRCode  = require('qrcode');
 require('dotenv').config();
 
+const APP_VERSION = require('./package.json').version;
+
 const app = express();
 app.set('trust proxy', 1); // Umbrel app_proxy sits in front
 
@@ -472,7 +474,7 @@ app.get('/health', async (req, res) => {
     res.json({
       status: 'ok',
       service: 'bolt12-offer-server',
-      version: '2.2.0',
+      version: APP_VERSION,
       lnd: { connected: true, alias: info.alias, version: info.version },
       lndk: { ready: lndkReady },
     });
@@ -498,7 +500,7 @@ function isLocalAddress(ip) {
 app.get('/api/v1/config', (req, res) => {
   const raw = req.socket?.remoteAddress || req.connection?.remoteAddress || '';
   if (!isLocalAddress(raw)) return res.status(403).json({ success: false, error: 'Forbidden' });
-  res.json({ apiKey: API_KEY, lndkReady, version: '2.2.0' });
+  res.json({ apiKey: API_KEY, lndkReady, version: APP_VERSION });
 });
 
 function checkLndBolt12Flags() {
@@ -549,15 +551,23 @@ function checkLndBolt12Flags() {
   return { source: null, flags: null, error: 'LND config not found in container' };
 }
 
+function hasOnionMessageSupport(features) {
+  if (!features) return false;
+  return !!features['38'] || !!features['39'];
+}
+
 app.get('/api/v1/diagnostic', auth, async (req, res) => {
   try {
-    const [info, channels] = await Promise.all([
+    const [info, channels, peers] = await Promise.all([
       lndRestGet('/v1/getinfo'),
       lndRestGet('/v1/channels').catch(() => ({ channels: [] })),
+      lndRestGet('/v1/peers').catch(() => ({ peers: [] })),
     ]);
     const flags = checkLndBolt12Flags();
     const chans = Array.isArray(channels.channels) ? channels.channels : [];
-    const publicChannels = chans.filter(c => c.private === false);
+    const publicChannels = chans.filter(c => c.private === false && c.active);
+    const peerList = Array.isArray(peers.peers) ? peers.peers : [];
+    const bolt12Peers = peerList.filter(p => hasOnionMessageSupport(p.features));
     res.json({
       success: true,
       lnd: {
@@ -572,6 +582,11 @@ app.get('/api/v1/diagnostic', auth, async (req, res) => {
         num_public_channels: publicChannels.length,
         num_pending_channels: info.num_pending_channels,
         features: info.features,
+      },
+      peers: {
+        total: peerList.length,
+        bolt12_capable: bolt12Peers.length,
+        bolt12_peer_pubkeys: bolt12Peers.map(p => p.pub_key),
       },
       bolt12_flags: flags,
       lndk: {
@@ -1230,7 +1245,7 @@ app.get('/api/v1/logs', auth, async (req, res) => {
 // ============================================
 // STARTUP
 // ============================================
-console.log('⚡ Bolt12 Offer Server v2.2.0 (LNDK mode)');
+console.log(`⚡ Bolt12 Offer Server v${APP_VERSION} (LNDK mode)`);
 console.log('==========================================');
 
 if (!initLndkClient()) {

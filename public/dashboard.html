@@ -1609,6 +1609,9 @@ async function loadDiagnostic(){
       if(!d.lnd.num_peers) issues.push('LND n\'a aucun peer connecté. Il faut au moins un peer pour relayer les onion messages.');
       if(!d.lnd.num_active_channels) issues.push('LND n\'a aucun canal actif. Les paiements Lightning ne peuvent pas aboutir sans liquidité.');
       if(d.lnd.num_active_channels && !d.lnd.num_public_channels) issues.push('LND n\'a aucun canal PUBLIC. BOLT12 a besoin d\'au moins un canal annoncé pour construire un chemin aveugle (blinded path).');
+      if(d.peers && d.peers.total > 0 && d.peers.bolt12_capable === 0){
+        issues.push('Aucun peer connecté ne supporte les onion messages BOLT12. Les demandes de facture ne pourront pas atteindre ton node. Ouvre un canal public avec un node compatible BOLT12 (ex: ACINQ 03864ef025…).');
+      }
       if(d.lnd.uris&&d.lnd.uris.length) ok.push(`Adresses annoncées : ${d.lnd.uris.join(', ')}`);
       ok.push(`Peers : ${d.lnd.num_peers||0} · Canaux actifs : ${d.lnd.num_active_channels||0}`);
       ok.push(`Version LND : ${d.lnd.version||'?'} · Alias : ${d.lnd.alias||'?'}`);
@@ -1621,6 +1624,8 @@ async function loadDiagnostic(){
       if(Number(flags[k])!==v){flagsOk=false;issues.push(`Flag BOLT12 manquant/incorrect : ${k}=${flags[k]??'non défini'} (attendu ${v}).`);}
     }
     if(flagsOk) ok.push('Flags BOLT12 activés ✓');
+
+    if(d.peers && d.peers.bolt12_capable > 0) ok.push(`${d.peers.bolt12_capable}/${d.peers.total} peer(s) supportent BOLT12 ✓`);
 
     if(!d.lndk?.ready) issues.push('LNDK n\'est pas prêt. Vérifie les logs du conteneur lndk.');
     else ok.push('LNDK prêt ✓');

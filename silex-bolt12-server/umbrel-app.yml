@@ -2,8 +2,8 @@ manifestVersion: 1.1
 id: silex-bolt12-server
 category: bitcoin
 name: Bolt12 Server
-version: "2.2.0"
-tagline: BOLT12 offers + Lightning Address — LNDK bundled, zero config
+version: "2.2.1"
+tagline: BOLT12 offers + Lightning Address — LNDK bundled, one-time LND flags setup
 icon: https://raw.githubusercontent.com/Silexperience210/bolt12-server/main/silex-bolt12-server/icon.svg
 description: >-
   Self-hosted BOLT12 Lightning server for your Umbrel node.
@@ -42,7 +42,8 @@ description: >-
   bash <(curl -s https://raw.githubusercontent.com/Silexperience210/bolt12-server/main/setup-lnd-flags.sh)
 
   This safely adds the flags to lnd.conf and restarts LND (~30s).
-  After that, install this app — everything else is fully automatic.
+  After that, install this app. You also need at least one public Lightning
+  channel with a BOLT12-compatible peer for invoice requests to reach your node.
 
 
   ── LIGHTNING ADDRESS (optional) ──
@@ -67,35 +68,23 @@ defaultPassword: ""
 submitter: silexperience210
 submission: https://github.com/Silexperience210/bolt12-server
 releaseNotes: >-
-  v2.2.0 — Security & robustness hardening
+  v2.2.1 — Production readiness & BOLT12 peer detection
 
-  Security improvements:
-  - API key comparison is now timing-safe
-  - /api/v1/config is restricted to local network connections only
-  - LNDK TLS certificate is now mandatory (no insecure fallback)
-  - API key file is created with 0o600 permissions
-  - Webhook SSRF protection now blocks all private CIDRs, DNS rebinding and IP alternatives
-  - QR codes are generated server-side (no external service)
-  - Frontend XSS vectors removed (DOM-based rendering, no inline JS attributes)
-  - CSV export is protected against spreadsheet injection
+  Production-readiness improvements:
+  - Docker images are now pinned to an explicit version tag (2.2.1) instead of
+    floating latest, so Umbrel pulls updates reliably
+  - New pre-start checks run inside the container and print clear warnings if
+    LND flags, public channels, or BOLT12-capable peers are missing
+  - setup-lnd-flags.sh now automatically escalates to sudo when UmbrelOS 1.x
+    settings.json is owned by root, and creates a timestamped backup
+  - Diagnostic endpoint now reports how many connected peers support BOLT12
+    onion messages
 
-  Robustness improvements:
-  - JSON file reads/writes are serialized with per-file mutexes
-  - All LND REST calls now have timeouts and HTTP status checks
-  - BigInt amounts are properly serialized as strings for gRPC
-  - Docker image runs as non-root user with healthcheck
-  - Deploy script and LNDK startup are more reliable
+  Dashboard improvements:
+  - Diagnostic tab warns when no connected peer supports BOLT12 onion messaging
+  - Clearer guidance on opening a public channel to a BOLT12-compatible peer
 
-  New features:
-  - Lightning Address / LNURL-pay (optional, set LNURL_DOMAIN to activate)
-  - LNDK version pinned to v0.3.0 (stable, no surprise breakages from updates)
-  - LNDK now waits for LND before starting (no more failed boot races)
-  - LNDK healthcheck built into Docker Compose
-
-  Security improvements:
-  - Full CSP + security headers on all responses
-  - Atomic JSON file writes (no corruption on power loss)
-  - SSRF protection on webhook URLs
-  - API key moved to sessionStorage (clears on tab close)
-  - JS libraries self-hosted at build time (no CDN at runtime)
-  - BigInt validation on all Lightning amounts
+  Remaining manual prerequisites:
+  - Run setup-lnd-flags.sh once before install
+  - Ensure LND has at least one public channel to a BOLT12-compatible peer
+    (e.g. ACINQ) so invoice requests can be relayed to your node

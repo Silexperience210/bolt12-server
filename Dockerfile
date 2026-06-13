@@ -34,4 +34,6 @@ EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3001/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)}).on('error', () => process.exit(1))"
 
-CMD ["node", "server.js"]
+# Pre-start health/dependency checks run before the server starts.
+# They print actionable warnings if LND flags, channels, or BOLT12 peers are missing.
+CMD ["sh", "-c", "node scripts/prestart-check.js && exec node server.js"]
