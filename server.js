@@ -513,9 +513,9 @@ function checkLndBolt12Flags() {
   ];
 
   const expected = {
-    'protocol.custom-message': '513',
-    'protocol.custom-nodeann': '39',
-    'protocol.custom-init': '39',
+    'protocol.custom-message': 513,
+    'protocol.custom-nodeann': 39,
+    'protocol.custom-init': 39,
   };
 
   // lnd.conf style
@@ -526,7 +526,7 @@ function checkLndBolt12Flags() {
       for (const key of Object.keys(expected)) {
         const re = new RegExp(`^${key.replace(/\./g, '\\.')}\\s*=\\s*(\\d+)`, 'm');
         const m = text.match(re);
-        flags[key] = m ? m[1] : null;
+        flags[key] = m ? Number(m[1]) : null;
       }
       return { source: p, flags };
     } catch { /* try next */ }
@@ -539,7 +539,7 @@ function checkLndBolt12Flags() {
       const lnd = data.lnd || {};
       const flags = {};
       for (const key of Object.keys(expected)) {
-        flags[key] = lnd[key] != null ? String(lnd[key]) : null;
+        flags[key] = lnd[key] != null ? Number(lnd[key]) : null;
       }
       return { source: p, flags };
     } catch { /* try next */ }
