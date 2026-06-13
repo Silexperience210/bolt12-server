@@ -432,6 +432,10 @@ textarea.inp{resize:vertical;min-height:80px;line-height:1.5}
       <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
       <span>Paramètres</span>
     </button>
+    <button class="tab" onclick="tab('diag',this)">
+      <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.3 1.046a1 1 0 011.7.954L10.217 8.5h3.59a1 1 0 01.815 1.573l-7 10a1 1 0 01-1.83-.573V10.5h-3a1 1 0 01-.764-1.642l7-9A1 1 0 017.7.858z" clip-rule="evenodd"/></svg>
+      <span>Diagnostic</span>
+    </button>
   </div>
 
   <!-- ── TAB: OFFERS ── -->
@@ -798,8 +802,24 @@ textarea.inp{resize:vertical;min-height:80px;line-height:1.5}
     </div>
   </div>
 
+  <!-- ── TAB: DIAGNOSTIC ── -->
+  <div class="panel" id="p-diag">
+    <div class="card">
+      <div class="list-header">
+        <div class="card-head" style="margin-bottom:0">
+          <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.3 1.046a1 1 0 011.7.954L10.217 8.5h3.59a1 1 0 01.815 1.573l-7 10a1 1 0 01-1.83-.573V10.5h-3a1 1 0 01-.764-1.642l7-9A1 1 0 017.7.858z" clip-rule="evenodd"/></svg>
+          Diagnostic BOLT12
+        </div>
+        <button class="btn btn-g" onclick="loadDiagnostic()" style="padding:7px 13px;font-size:12px">Refresh</button>
+      </div>
+      <div id="diag-content" style="margin-top:18px">
+        <p style="color:var(--muted);font-size:13px">Clique sur Refresh pour analyser ton node.</p>
+      </div>
+    </div>
+  </div>
+
   <div class="footer">
-    <span>BOLT12 Server v2.0</span>
+    <span>BOLT12 Server v2.2</span>
     <a href="/health" target="_blank">health</a>
     <span id="last-sync" style="opacity:.35"></span>
   </div>
@@ -962,6 +982,7 @@ function tab(id, el){
 
   if(id==='stats') loadStats();
   if(id==='settings'){loadWebhooks();loadLogs();updateSessionInfo();}
+  if(id==='diag') loadDiagnostic();
 }
 
 // ── AUTH ──
@@ -1568,6 +1589,45 @@ async function loadLogs(){
       </div>`;
     }).join('');
   }catch(e){list.innerHTML=`<div style="text-align:center;padding:20px;font-size:13px;color:var(--red)">${esc(e.message)}</div>`;}
+}
+
+// ── DIAGNOSTIC ──
+async function loadDiagnostic(){
+  if(!KEY) return;
+  const el=document.getElementById('diag-content');
+  el.innerHTML='<div style="text-align:center;padding:30px;color:var(--muted)">Analyse en cours…</div>';
+  try{
+    const d=await api('/diagnostic');
+    const issues=[];
+    const ok=[];
+
+    if(!d.lnd?.connected){issues.push('LND non connecté. Vérifie que l\'app Lightning est démarrée.');}
+    else {
+      if(!d.lnd.synced_to_chain) issues.push('LND n\'est pas synchronisé à la chaîne.');
+      if(!d.lnd.synced_to_graph) issues.push('LND n\'est pas synchronisé au graphe.');
+      if(!d.lnd.uris||!d.lnd.uris.length) issues.push('LND n\'annonce aucune adresse externe (Tor/IP). BOLT12 nécessite d\'être joignable.');
+      if(!d.lnd.num_peers) issues.push('LND n\'a aucun peer connecté. Il faut au moins un peer pour relayer les onion messages.');
+      if(!d.lnd.num_active_channels) issues.push('LND n\'a aucun canal actif. Les paiements Lightning ne peuvent pas aboutir sans liquidité.');
+      if(d.lnd.uris&&d.lnd.uris.length) ok.push(`Adresses annoncées : ${d.lnd.uris.join(', ')}`);
+      ok.push(`Peers : ${d.lnd.num_peers||0} · Canaux actifs : ${d.lnd.num_active_channels||0}`);
+      ok.push(`Version LND : ${d.lnd.version||'?'} · Alias : ${d.lnd.alias||'?'}`);
+    }
+
+    const flags=d.bolt12_flags?.flags||{};
+    const expected={'protocol.custom-message':'513','protocol.custom-nodeann':'39','protocol.custom-init':'39'};
+    let flagsOk=true;
+    for(const [k,v] of Object.entries(expected)){
+      if(flags[k]!==v){flagsOk=false;issues.push(`Flag BOLT12 manquant/incorrect : ${k}=${flags[k]??'non défini'} (attendu ${v}).`);}
+    }
+    if(flagsOk) ok.push('Flags BOLT12 activés ✓');
+
+    if(!d.lndk?.ready) issues.push('LNDK n\'est pas prêt. Vérifie les logs du conteneur lndk.');
+    else ok.push('LNDK prêt ✓');
+
+    const render=(arr,color)=>arr.map(x=>`<div style="padding:10px 12px;border-radius:8px;background:${color};margin-bottom:8px;font-size:13px;line-height:1.5">${esc(x)}</div>`).join('');
+    const raw=`<details style="margin-top:16px"><summary style="cursor:pointer;color:var(--muted);font-size:12px">Réponse brute</summary><pre style="margin-top:10px;padding:12px;background:rgba(0,0,0,.3);border-radius:10px;font-size:11px;overflow:auto;max-height:300px">${esc(JSON.stringify(d,null,2))}</pre></details>`;
+    el.innerHTML=(issues.length?render(issues,'rgba(239,68,68,.12)'):'')+(ok.length?render(ok,'rgba(34,197,94,.12)'):'')+raw;
+  }catch(e){el.innerHTML=`<div style="text-align:center;padding:20px;font-size:13px;color:var(--red)">${esc(e.message)}</div>`;}
 }
 
 // ── SESSION INFO ──
