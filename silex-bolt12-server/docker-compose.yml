@@ -61,7 +61,8 @@ services:
       LND_REST_HOST: "${APP_LIGHTNING_NODE_IP}:8080"
       LNDK_HOST: lndk:10010
       LNDK_TLS_PATH: /lndk-data/tls-cert.pem
-      LNDK_MACAROON_PATH: /lndk-data/admin.macaroon
+      # LNDK acts as a proxy to LND, so we must pass LND's admin macaroon.
+      LNDK_MACAROON_PATH: /lnd/data/chain/bitcoin/mainnet/admin.macaroon
       # Lightning Address (optional — set your public domain to enable)
       LNURL_DOMAIN: ""
       LNURL_USERNAME: "pay"

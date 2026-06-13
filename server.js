@@ -426,7 +426,10 @@ function initLndkClient() {
     const sslCreds = grpc.credentials.createSsl(lndkCert);
     const creds = grpc.credentials.combineChannelCredentials(sslCreds, macaroonCreds);
 
-    lndkClient = new lndkrpc.Offers(LNDK_HOST, creds);
+    lndkClient = new lndkrpc.Offers(LNDK_HOST, creds, {
+      'grpc.ssl_target_name_override': 'localhost',
+      'grpc.default_authority': 'localhost',
+    });
     lndkReady  = true;
     clearTimeout(_retryTimer);
     console.log(`✅ LNDK client initialized at ${LNDK_HOST}`);
