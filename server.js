@@ -501,6 +501,88 @@ app.get('/api/v1/config', (req, res) => {
   res.json({ apiKey: API_KEY, lndkReady, version: '2.2.0' });
 });
 
+function checkLndBolt12Flags() {
+  // UmbrelOS 0.5.x uses lnd.conf; UmbrelOS 1.x uses lightning/settings.json
+  const confPaths = [
+    '/lnd/lnd/lnd.conf',
+    '/lnd/lnd.conf',
+  ];
+  const settingsPaths = [
+    '/lnd/lightning/settings.json',
+    '/lnd/data/lightning/settings.json',
+  ];
+
+  const expected = {
+    'protocol.custom-message': '513',
+    'protocol.custom-nodeann': '39',
+    'protocol.custom-init': '39',
+  };
+
+  // lnd.conf style
+  for (const p of confPaths) {
+    try {
+      const text = fs.readFileSync(p, 'utf8');
+      const flags = {};
+      for (const key of Object.keys(expected)) {
+        const re = new RegExp(`^${key.replace(/\./g, '\\.')}\\s*=\\s*(\\d+)`, 'm');
+        const m = text.match(re);
+        flags[key] = m ? m[1] : null;
+      }
+      return { source: p, flags };
+    } catch { /* try next */ }
+  }
+
+  // settings.json style
+  for (const p of settingsPaths) {
+    try {
+      const data = JSON.parse(fs.readFileSync(p, 'utf8'));
+      const lnd = data.lnd || {};
+      const flags = {};
+      for (const key of Object.keys(expected)) {
+        flags[key] = lnd[key] != null ? String(lnd[key]) : null;
+      }
+      return { source: p, flags };
+    } catch { /* try next */ }
+  }
+
+  return { source: null, flags: null, error: 'LND config not found in container' };
+}
+
+app.get('/api/v1/diagnostic', auth, async (req, res) => {
+  try {
+    const info = await lndRestGet('/v1/getinfo');
+    const flags = checkLndBolt12Flags();
+    res.json({
+      success: true,
+      lnd: {
+        connected: true,
+        alias: info.alias,
+        version: info.version,
+        synced_to_chain: info.synced_to_chain,
+        synced_to_graph: info.synced_to_graph,
+        uris: info.uris || [],
+        num_peers: info.num_peers,
+        num_active_channels: info.num_active_channels,
+        num_pending_channels: info.num_pending_channels,
+        features: info.features,
+      },
+      bolt12_flags: flags,
+      lndk: {
+        ready: lndkReady,
+        host: LNDK_HOST,
+      },
+    });
+  } catch (err) {
+    res.status(503).json({
+      success: false,
+      error: err.message,
+      lnd: { connected: false },
+      bolt12_flags: checkLndBolt12Flags(),
+      lndk: { ready: lndkReady, host: LNDK_HOST },
+    });
+  }
+});
+
 app.get('/', (req, res) => res.redirect('/dashboard.html'));
 
 // ============================================

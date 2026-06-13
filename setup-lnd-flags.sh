@@ -49,9 +49,9 @@ if "lnd" not in data or not isinstance(data["lnd"], dict):
     data["lnd"] = {}
 
 flags = {
-    "protocol.custom-message": 513,
-    "protocol.custom-nodeann": 39,
-    "protocol.custom-init": 39,
+    "protocol.custom-message": "513",
+    "protocol.custom-nodeann": "39",
+    "protocol.custom-init": "39",
 }
 
 changed = False
