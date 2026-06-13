@@ -4,7 +4,7 @@ services:
   app_proxy:
     environment:
       # Use the Compose service name instead of the hardcoded container name.
-      APP_HOST: server
+      APP_HOST: web
       APP_PORT: 3001
       PROXY_AUTH_ADD: "false"
     # NOTE: app_proxy is injected by Umbrel itself; do not add restart/image here.
@@ -39,7 +39,7 @@ services:
       retries: 5
       start_period: 60s
 
-  server:
+  web:
     image: ghcr.io/silexperience210/bolt12-server:latest
     restart: unless-stopped
     stop_grace_period: 1m
@@ -51,7 +51,7 @@ services:
       # The server only reads LNDK's TLS cert and macaroon; LNDK itself writes them.
       - lndk-data:/lndk-data:ro
       # Named volume avoids UID/GID permission issues with the node user.
-      - server-data:/app/data
+      - web-data:/app/data
     environment:
       NODE_ENV: production
       PORT: "3001"
@@ -75,4 +75,4 @@ services:
 
 volumes:
   lndk-data:
-  server-data:
+  web-data:
