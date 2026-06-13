@@ -1,4 +1,4 @@
-version: "3.7"
+version: "3.8"
 
 services:
   app_proxy:
@@ -7,7 +7,7 @@ services:
       APP_HOST: server
       APP_PORT: 3001
       PROXY_AUTH_ADD: "false"
-    restart: unless-stopped
+    # NOTE: app_proxy is injected by Umbrel itself; do not add restart/image here.
 
   lndk:
     image: ghcr.io/silexperience210/lndk:v0.3.0
@@ -20,7 +20,9 @@ services:
       LND_WAIT_TIMEOUT: "180"
     volumes:
       - ${APP_LIGHTNING_NODE_DATA_DIR}:/lnd:ro
-      - ${APP_DATA_DIR}/lndk-data:/home/lndk/.lndk
+      # Named volume avoids UID/GID permission issues between the non-root
+      # lndk user and the host directory created by Umbrel.
+      - lndk-data:/home/lndk/.lndk
     command:
       - "--address=https://${APP_LIGHTNING_NODE_IP}:10009"
       - "--cert-path=/lnd/tls.cert"
@@ -40,11 +42,12 @@ services:
     restart: unless-stopped
     stop_grace_period: 1m
     depends_on:
-      - lndk
+      lndk:
+        condition: service_healthy
     volumes:
       - ${APP_LIGHTNING_NODE_DATA_DIR}:/lnd:ro
       # The server only reads LNDK's TLS cert and macaroon; LNDK itself writes them.
-      - ${APP_DATA_DIR}/lndk-data:/lndk-data:ro
+      - lndk-data:/lndk-data:ro
       - ${APP_DATA_DIR}/data:/app/data
     environment:
       NODE_ENV: production
@@ -66,3 +69,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+
+volumes:
+  lndk-data:
