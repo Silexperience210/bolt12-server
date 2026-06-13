@@ -4,7 +4,7 @@ services:
   app_proxy:
     environment:
       # Use the Compose service name instead of the hardcoded container name.
-      APP_HOST: web
+      APP_HOST: silex-bolt12-server-web
       APP_PORT: 3001
       PROXY_AUTH_ADD: "false"
     # NOTE: app_proxy is injected by Umbrel itself; do not add restart/image here.
@@ -40,6 +40,7 @@ services:
       start_period: 60s
 
   web:
+    container_name: silex-bolt12-server-web
     image: ghcr.io/silexperience210/bolt12-server:latest
     restart: unless-stopped
     stop_grace_period: 1m
