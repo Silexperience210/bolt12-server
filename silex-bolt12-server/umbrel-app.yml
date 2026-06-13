@@ -56,7 +56,7 @@ dependencies:
   - lightning
 repo: https://github.com/Silexperience210/bolt12-server
 support: https://github.com/Silexperience210/bolt12-server/issues
-port: 3001
+port: 3043
 gallery:
   - https://raw.githubusercontent.com/Silexperience210/bolt12-server/main/silex-bolt12-server/screenshots/1.svg
   - https://raw.githubusercontent.com/Silexperience210/bolt12-server/main/silex-bolt12-server/screenshots/2.svg
