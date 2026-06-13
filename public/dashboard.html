@@ -1614,10 +1614,10 @@ async function loadDiagnostic(){
     }
 
     const flags=d.bolt12_flags?.flags||{};
-    const expected={'protocol.custom-message':'513','protocol.custom-nodeann':'39','protocol.custom-init':'39'};
+    const expected={'protocol.custom-message':513,'protocol.custom-nodeann':39,'protocol.custom-init':39};
     let flagsOk=true;
     for(const [k,v] of Object.entries(expected)){
-      if(flags[k]!==v){flagsOk=false;issues.push(`Flag BOLT12 manquant/incorrect : ${k}=${flags[k]??'non défini'} (attendu ${v}).`);}
+      if(Number(flags[k])!==v){flagsOk=false;issues.push(`Flag BOLT12 manquant/incorrect : ${k}=${flags[k]??'non défini'} (attendu ${v}).`);}
     }
     if(flagsOk) ok.push('Flags BOLT12 activés ✓');
 
