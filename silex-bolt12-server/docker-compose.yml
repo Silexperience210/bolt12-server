@@ -50,7 +50,8 @@ services:
       - ${APP_LIGHTNING_NODE_DATA_DIR}:/lnd:ro
       # The server only reads LNDK's TLS cert and macaroon; LNDK itself writes them.
       - lndk-data:/lndk-data:ro
-      - ${APP_DATA_DIR}/data:/app/data
+      # Named volume avoids UID/GID permission issues with the node user.
+      - server-data:/app/data
     environment:
       NODE_ENV: production
       PORT: "3001"
@@ -74,3 +75,4 @@ services:
 
 volumes:
   lndk-data:
+  server-data:
