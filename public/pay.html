@@ -330,9 +330,31 @@ function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/<
 
 let _offerStr = '';
 
+function copyToClipboard(text){
+  if(!text) return Promise.reject(new Error('Nothing to copy'));
+  if(navigator.clipboard && window.isSecureContext){
+    return navigator.clipboard.writeText(text);
+  }
+  // Fallback for iframes / non-secure contexts
+  const ta=document.createElement('textarea');
+  ta.value=text;
+  ta.setAttribute('readonly','');
+  ta.style.position='absolute';ta.style.left='-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  try{
+    const ok=document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok?Promise.resolve():Promise.reject(new Error('execCommand copy failed'));
+  }catch(e){
+    document.body.removeChild(ta);
+    return Promise.reject(e);
+  }
+}
+
 function copyOfferStr(){
-  if(!_offerStr) return;
-  navigator.clipboard.writeText(_offerStr).then(()=>toast('Offer copiée !','ok'));
+  if(!_offerStr) return toast('Offer non disponible','err');
+  copyToClipboard(_offerStr).then(()=>toast('Offer copiée !','ok')).catch(e=>toast('Erreur copie: '+e.message,'err'));
 }
 
 function showError(title, sub){
