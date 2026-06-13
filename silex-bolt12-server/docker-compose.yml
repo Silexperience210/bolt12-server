@@ -59,7 +59,7 @@ services:
       LND_MACAROON_PATH: /lnd/data/chain/bitcoin/mainnet/admin.macaroon
       LND_REST_HOST: "${APP_LIGHTNING_NODE_IP}:8080"
       LNDK_HOST: lndk:10010
-      LNDK_TLS_PATH: /lndk-data/tls.cert
+      LNDK_TLS_PATH: /lndk-data/tls-cert.pem
       LNDK_MACAROON_PATH: /lndk-data/admin.macaroon
       # Lightning Address (optional — set your public domain to enable)
       LNURL_DOMAIN: ""
