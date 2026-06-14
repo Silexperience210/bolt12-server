@@ -2,7 +2,7 @@ manifestVersion: 1.1
 id: silex-bolt12-server
 category: bitcoin
 name: Bolt12 Server
-version: "2.2.1"
+version: "2.2.2"
 tagline: BOLT12 offers + Lightning Address — LNDK bundled, one-time LND flags setup
 icon: https://raw.githubusercontent.com/Silexperience210/bolt12-server/main/silex-bolt12-server/icon.svg
 description: >-
@@ -68,6 +68,19 @@ defaultPassword: ""
 submitter: silexperience210
 submission: https://github.com/Silexperience210/bolt12-server
 releaseNotes: >-
+  v2.2.2 — Bug fixes
+
+  - Fix: creating an offer with a fixed amount no longer returns an error
+    (BOLT12 offers were saved but the response failed to serialize)
+  - Fix: the container could refuse to start when lnd.conf wrote the BOLT12
+    flags with spaces around "=" — flag detection now handles both forms
+  - Fix: LNDK macaroon path — the server now passes LND's macaroon to LNDK
+    (which LNDK forwards to LND), so offer/pay/decode calls authenticate
+  - Hardening: malformed API keys return 401 cleanly; amount 0 means a
+    free (payer-chooses) offer
+  - Manual SSH deploy now uses a self-contained compose file
+
+
   v2.2.1 — Production readiness & BOLT12 peer detection
 
   Production-readiness improvements:
