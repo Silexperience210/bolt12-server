@@ -448,8 +448,8 @@ textarea.inp{resize:vertical;min-height:80px;line-height:1.5}
       </div>
       <div class="row2">
         <div>
-          <label>Montant (sats)</label>
-          <input class="inp" type="number" id="o-amount" placeholder="0 = libre" min="0">
+          <label>Montant (sats) <span class="req">*</span></label>
+          <input class="inp" type="number" id="o-amount" placeholder="Montant en sats (requis)" min="1">
         </div>
         <div>
           <label>Description <span class="req">*</span></label>
@@ -460,7 +460,7 @@ textarea.inp{resize:vertical;min-height:80px;line-height:1.5}
         <span class="chip" onclick="quickOffer(21000,'21K sats')">⚡ 21K sats</span>
         <span class="chip" onclick="quickOffer(100000,'100K sats')">⚡ 100K sats</span>
         <span class="chip" onclick="quickOffer(1000000,'1M sats')">⚡ 1M sats</span>
-        <span class="chip" onclick="quickOffer(0,'Donation libre')">🎁 Donation libre</span>
+        <span class="chip" onclick="quickOffer(10000,'Donation')">🎁 Don 10K</span>
       </div>
       <!-- Options avancées -->
       <div style="margin-bottom:16px">
@@ -1128,7 +1128,7 @@ async function createOffer(){
   const amount=parseInt(document.getElementById('o-amount').value)||0;
   const desc=document.getElementById('o-desc').value.trim();
   if(!desc){toast('Description obligatoire','err');return;}
-  if(amount<0||amount>MAX_SATS){toast(`Montant invalide (max ${fmt(MAX_SATS)} sats)`,'err');return;}
+  if(amount<1||amount>MAX_SATS){toast(`Montant requis : 1 à ${fmt(MAX_SATS)} sats (LNDK ne gère pas les offres sans montant)`,'err');return;}
   const issuer=document.getElementById('o-issuer').value.trim();
   const expiry=parseInt(document.getElementById('o-expiry').value)||0;
   const quantity=parseInt(document.getElementById('o-quantity').value)||0;
