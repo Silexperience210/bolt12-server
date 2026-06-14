@@ -2,7 +2,7 @@ manifestVersion: 1.1
 id: silex-bolt12-server
 category: bitcoin
 name: Bolt12 Server
-version: "2.2.2"
+version: "2.2.3"
 tagline: BOLT12 offers + Lightning Address — LNDK bundled, one-time LND flags setup
 icon: https://raw.githubusercontent.com/Silexperience210/bolt12-server/main/silex-bolt12-server/icon.svg
 description: >-
@@ -68,6 +68,16 @@ defaultPassword: ""
 submitter: silexperience210
 submission: https://github.com/Silexperience210/bolt12-server
 releaseNotes: >-
+  v2.2.3 — Amount unit fix
+
+  - Fix: offer and invoice amounts were sent to LNDK in satoshis but interpreted
+    as millisatoshis, so a 10,000 sat offer showed as 10 sats in wallets like
+    Phoenix. Amounts are now converted correctly (sats ↔ msats) for create offer,
+    pay, and get-invoice.
+  - Offers now require a positive amount: LNDK v0.3.0 cannot create amountless
+    (payer-chooses) offers, and a 0 amount produced an unpayable 0-sat offer.
+
+
   v2.2.2 — Bug fixes
 
   - Fix: creating an offer with a fixed amount no longer returns an error

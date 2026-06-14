@@ -177,6 +177,14 @@ function truncate(str, max) {
 }
 
 /**
+ * LNDK / BOLT12 amount fields are denominated in millisatoshis, but this API
+ * and the dashboard work in satoshis. Convert before sending to LNDK.
+ */
+function satsToMsats(sats) {
+  return sats * 1000n;
+}
+
+/**
  * Escape a CSV cell. Quotes everything, doubles embedded quotes,
  * and prefixes formula-triggering characters with a tab to neutralise
  * spreadsheet injection vectors.
@@ -641,13 +649,16 @@ app.post('/api/v1/offers', apiLimiter, auth, (req, res) => {
     return res.status(400).json({ success: false, error: err.message });
   }
 
-  // "0 = libre" in the UI: a zero amount means an amountless (payer-chooses) offer,
-  // so omit it from the LNDK request rather than creating a 0-msat offer.
-  if (amountB === 0n) amountB = null;
+  // LNDK v0.3.0 always encodes an amount in the offer (no amountless mode), and a
+  // 0-amount offer cannot be paid by wallets — so require a positive amount.
+  if (amountB === null || amountB === 0n) {
+    return res.status(400).json({ success: false, error: 'amount (in sats) is required and must be greater than 0 — LNDK does not support amountless offers' });
+  }
 
   const request = { description: desc };
-  // gRPC int64/uint64 fields expect strings (longs: String in protoLoader)
-  if (amountB   !== null) request.amount   = amountB.toString();
+  // gRPC int64/uint64 fields expect strings (longs: String in protoLoader).
+  // BOLT12 amounts are in millisatoshis; this API works in sats.
+  request.amount = satsToMsats(amountB).toString();
   if (expiryB   !== null) request.expiry   = expiryB.toString();
   if (issuerV)            request.issuer   = issuerV;
   if (quantityB !== null) request.quantity = quantityB.toString();
@@ -830,7 +841,7 @@ app.post('/api/v1/pay', apiLimiter, auth, (req, res) => {
   }
 
   const request = { offer };
-  if (amountB !== null) request.amount = amountB.toString();
+  if (amountB !== null) request.amount = satsToMsats(amountB).toString();
   if (payer_note) request.payer_note = truncate(String(payer_note), 256);
 
   const deadline = new Date();
@@ -857,7 +868,7 @@ app.post('/api/v1/offers/invoice', apiLimiter, auth, (req, res) => {
   }
 
   const request = { offer };
-  if (amountB !== null) request.amount = amountB.toString();
+  if (amountB !== null) request.amount = satsToMsats(amountB).toString();
   if (payer_note) request.payer_note = truncate(String(payer_note), 256);
 
   const deadline = new Date();
@@ -883,7 +894,7 @@ app.post('/api/v1/pay/invoice', apiLimiter, auth, (req, res) => {
   }
 
   const request = { invoice };
-  if (amountB !== null) request.amount = amountB.toString();
+  if (amountB !== null) request.amount = satsToMsats(amountB).toString();
 
   const deadline = new Date();
   deadline.setSeconds(deadline.getSeconds() + 90);
