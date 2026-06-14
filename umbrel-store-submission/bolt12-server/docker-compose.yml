@@ -1,0 +1,75 @@
+services:
+  app_proxy:
+    environment:
+      # Umbrel names containers <app-id>_<service>_1. Maintainers may adjust this.
+      APP_HOST: bolt12-server_web_1
+      APP_PORT: 3001
+      PROXY_AUTH_ADD: "false"
+
+  lndk:
+    # LNDK bundled — built from source, pinned by multi-arch digest.
+    image: ghcr.io/silexperience210/lndk@sha256:efb58493b9fbf406c0f1fd683e17ec45078986c8e839a79341084a3367bc2004
+    # Run as root so LNDK can write to the named volume regardless of host UID.
+    user: root
+    restart: unless-stopped
+    stop_grace_period: 1m
+    environment:
+      LND_WAIT_HOST: "${APP_LIGHTNING_NODE_IP}"
+      LND_WAIT_PORT: "10009"
+      LND_WAIT_TIMEOUT: "180"
+    volumes:
+      - ${APP_LIGHTNING_NODE_DATA_DIR}:/lnd:ro
+      - lndk-data:/home/lndk/.lndk
+    command:
+      - "--address=https://${APP_LIGHTNING_NODE_IP}:10009"
+      - "--cert-path=/lnd/tls.cert"
+      - "--macaroon-path=/lnd/data/chain/bitcoin/mainnet/admin.macaroon"
+      - "--grpc-host=0.0.0.0"
+      - "--grpc-port=10010"
+      - "--data-dir=/home/lndk/.lndk"
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "10010"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  web:
+    image: ghcr.io/silexperience210/bolt12-server@sha256:4569c33791c39238e90e96585cdc1a9b3d5fee3e7c49fdd6065fee628dabfaae
+    restart: unless-stopped
+    stop_grace_period: 1m
+    depends_on:
+      lndk:
+        condition: service_healthy
+    volumes:
+      - ${APP_LIGHTNING_NODE_DATA_DIR}:/lnd:ro
+      # UmbrelOS 1.x stores Lightning settings.json next to the lnd data dir.
+      - ${APP_LIGHTNING_NODE_DATA_DIR}/../lightning:/lightning:ro
+      # The server only reads LNDK's TLS cert; LNDK itself writes it.
+      - lndk-data:/lndk-data:ro
+      - web-data:/app/data
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+      LND_TLS_PATH: /lnd/tls.cert
+      LND_MACAROON_PATH: /lnd/data/chain/bitcoin/mainnet/admin.macaroon
+      LND_REST_HOST: "${APP_LIGHTNING_NODE_IP}:8080"
+      LNDK_HOST: lndk:10010
+      LNDK_TLS_PATH: /lndk-data/tls-cert.pem
+      # LNDK forwards this macaroon to LND, so it must be an LND macaroon.
+      LNDK_MACAROON_PATH: /lnd/data/chain/bitcoin/mainnet/admin.macaroon
+      # Lightning Address (optional — set your public domain to enable)
+      LNURL_DOMAIN: ""
+      LNURL_USERNAME: "pay"
+      LNURL_MIN_MSATS: "1000"
+      LNURL_MAX_MSATS: "10000000000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  lndk-data:
+  web-data:

@@ -1,0 +1,54 @@
+manifestVersion: 1.1
+id: bolt12-server
+category: bitcoin
+name: Bolt12 Server
+version: "2.2.4"
+tagline: BOLT12 offers + Lightning Address for your LND node — LNDK bundled
+description: >-
+  Self-hosted BOLT12 Lightning server for your Umbrel node. Create reusable
+  payment offers, receive payments, decode invoices and track history. LNDK is
+  bundled automatically — no separate installation required.
+
+
+  ── FEATURES ──
+
+  ⚡ BOLT12 Offers — reusable payment offers with a fixed amount
+
+  💸 Pay & Decode — pay BOLT12 offers and decode invoices from the dashboard
+
+  📊 14-Day Stats — sent/received activity chart
+
+  📋 Payment History — full log with CSV export
+
+  🔗 Shareable Pay Links — a public pay page with QR code per offer
+
+  🌐 Lightning Address — optional pay@yourdomain.com (LNURL-pay)
+
+  🔔 Webhooks — HTTP callbacks on payment events
+
+  🔑 Auto API Key — generated on first start, local-network only
+
+  🛡 Security-hardened — CSP, X-Frame-Options, atomic writes, SSRF protection
+
+
+  ── ONE-TIME PREREQUISITE ──
+
+  BOLT12 needs three onion-message protocol flags on your LND node. After
+  installing, open the app: a built-in setup assistant detects what's missing,
+  gives you the exact one-line command to run once over SSH, and validates it
+  live (the checklist turns green on its own). You'll also need at least one
+  public Lightning channel to a BOLT12-capable peer (e.g. ACINQ) to receive.
+developer: silexperience210
+website: https://github.com/Silexperience210/bolt12-server
+dependencies:
+  - lightning
+repo: https://github.com/Silexperience210/bolt12-server
+support: https://github.com/Silexperience210/bolt12-server/issues
+port: 3043
+gallery: []
+path: ""
+defaultUsername: ""
+defaultPassword: ""
+submitter: silexperience210
+submission: ""
+releaseNotes: ""

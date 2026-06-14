@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1033"/>
+      <stop offset="100%" style="stop-color:#2d1b6e"/>
+    </linearGradient>
+    <linearGradient id="shield_grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#a78bfa"/>
+      <stop offset="100%" style="stop-color:#7c3aed"/>
+    </linearGradient>
+    <linearGradient id="bolt_grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#fde68a"/>
+      <stop offset="100%" style="stop-color:#f59e0b"/>
+    </linearGradient>
+  </defs>
+  <rect width="100" height="100" rx="22" ry="22" fill="url(#bg)"/>
+  <path d="M50 14 L74 24 L74 48 C74 63 63 74 50 80 C37 74 26 63 26 48 L26 24 Z" fill="url(#shield_grad)" opacity="0.9"/>
+  <polygon points="55,30 41,51 50,51 45,70 62,47 52,47 58,30" fill="url(#bolt_grad)"/>
+</svg>
