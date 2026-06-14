@@ -1,6 +1,6 @@
 {
   "name": "bolt12-offer-server",
-  "version": "2.2.3",
+  "version": "2.2.4",
   "description": "API REST pour générer des offers Bolt12 avec LND",
   "main": "server.js",
   "scripts": {

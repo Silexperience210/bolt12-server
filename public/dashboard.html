@@ -216,9 +216,18 @@ textarea.inp{resize:vertical;min-height:80px;line-height:1.5}
 .empty p{font-size:14px}.empty small{font-size:12px;display:block;margin-top:5px;opacity:.55}
 
 /* ─── AUTH OVERLAY ─── */
-#auth-ov{display:none;position:fixed;inset:0;z-index:200;background:rgba(5,5,16,.88);backdrop-filter:blur(14px);align-items:center;justify-content:center}
-#auth-ov.show{display:flex;animation:up .4s both}
+#auth-ov,#setup-ov{display:none;position:fixed;inset:0;z-index:200;background:rgba(5,5,16,.88);backdrop-filter:blur(14px);align-items:center;justify-content:center;padding:16px}
+#auth-ov.show,#setup-ov.show{display:flex;animation:up .4s both}
 .auth-box{background:rgba(255,255,255,.04);border:1px solid rgba(139,92,246,.32);border-radius:22px;padding:36px;width:100%;max-width:400px;box-shadow:0 40px 80px rgba(0,0,0,.6),0 0 80px rgba(139,92,246,.12)}
+.setup-box{max-width:520px;max-height:88vh;overflow-y:auto}
+.su-item{display:flex;gap:12px;align-items:flex-start;padding:11px 13px;border-radius:12px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.06);margin-bottom:9px}
+.su-ic{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;font-weight:700;margin-top:1px}
+.su-ok{background:rgba(34,197,94,.15);color:#4ade80}
+.su-wait{background:rgba(245,158,11,.13);color:#fbbf24}
+.su-todo{background:rgba(148,163,184,.12);color:#94a3b8}
+.su-t{font-size:13.5px;font-weight:600;margin-bottom:2px}
+.su-d{font-size:11.5px;color:var(--muted);line-height:1.45}
+.su-cmd{background:rgba(0,0,0,.45);border:1px solid rgba(139,92,246,.25);border-radius:10px;padding:11px 12px;font-family:'SF Mono','Fira Code',monospace;font-size:11px;color:var(--pL);word-break:break-all;line-height:1.5;margin:6px 0 10px}
 .auth-title{font-size:20px;font-weight:800;margin-bottom:6px}
 .auth-sub{font-size:13px;color:var(--muted);margin-bottom:22px;line-height:1.5}
 /* key display inside overlay */
@@ -274,6 +283,28 @@ textarea.inp{resize:vertical;min-height:80px;line-height:1.5}
 <div class="amb a1"></div><div class="amb a2"></div><div class="amb a3"></div>
 
 <!-- ── AUTH OVERLAY ── -->
+<!-- ── SETUP WIZARD OVERLAY ── -->
+<div id="setup-ov">
+  <div class="auth-box setup-box">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+      <div style="width:38px;height:38px;border-radius:11px;background:linear-gradient(145deg,#1e0a4e,#0d0628);border:1px solid rgba(139,92,246,.4);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg viewBox="0 0 20 20" fill="#c4b5fd" style="width:19px;height:19px"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
+      </div>
+      <div>
+        <div class="auth-title" style="margin-bottom:2px">Configuration BOLT12</div>
+        <div style="font-size:12px;color:var(--muted)">Une étape unique pour activer la réception BOLT12</div>
+      </div>
+    </div>
+    <div id="setup-checklist"></div>
+    <div id="setup-action" style="margin-top:6px"></div>
+    <div style="display:flex;gap:9px;margin-top:16px">
+      <button class="btn btn-g" onclick="closeSetup()" style="flex:1;font-size:13px">Plus tard</button>
+      <button class="btn btn-p" onclick="pollSetupOnce()" id="setup-recheck" style="flex:1;font-size:13px">Re-vérifier</button>
+    </div>
+    <div id="setup-note" style="text-align:center;font-size:11px;color:var(--muted);margin-top:10px">🔄 Vérification automatique toutes les 5 s…</div>
+  </div>
+</div>
+
 <div id="auth-ov">
   <div class="auth-box">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px">
@@ -389,6 +420,17 @@ textarea.inp{resize:vertical;min-height:80px;line-height:1.5}
   </div>
 
   <!-- LNDK setup banner -->
+  <div id="setup-banner" style="display:none;margin:0 0 16px;background:linear-gradient(135deg,rgba(139,92,246,.1),rgba(245,158,11,.06));border:1px solid rgba(139,92,246,.32);border-radius:16px;padding:16px 18px">
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <div style="font-size:22px">⚙️</div>
+      <div style="flex:1;min-width:180px">
+        <div style="font-weight:700;font-size:14px;margin-bottom:2px">Configuration BOLT12 à terminer</div>
+        <div style="font-size:12px;color:var(--muted)">Une étape unique (SSH) pour activer la réception BOLT12 sur ton node.</div>
+      </div>
+      <button class="btn btn-p" onclick="openSetup()" style="font-size:12px;padding:8px 14px">Ouvrir l'assistant</button>
+    </div>
+  </div>
+
   <div id="lndk-banner" style="display:none;margin:0 0 16px;background:linear-gradient(135deg,rgba(245,158,11,.08),rgba(124,58,237,.08));border:1px solid rgba(245,158,11,.3);border-radius:16px;padding:18px 20px">
     <div style="display:flex;align-items:flex-start;gap:14px">
       <div style="font-size:28px;line-height:1">⚡</div>
@@ -1120,6 +1162,102 @@ async function init(){
   loadOffers();
   setInterval(loadBalance,30000);
   setInterval(loadOffers,30000);
+  checkSetupGate();
+}
+
+// ── SETUP WIZARD (BOLT12 onboarding, live validation) ──
+const SETUP_CMD='bash <(curl -s https://raw.githubusercontent.com/Silexperience210/bolt12-server/main/setup-lnd-flags.sh)';
+const ACINQ_PEER='03864ef025fde8fb587d989186ce6a4a186895ee44a926bfc370e2c366597a3f8f@of7husrflx7sforh3fw6yqlpwstee3wg5imvvmkp4bz6rbjxtg5nljad.onion:9735';
+let _setupTimer=null,_setupOpen=false,_setupComplete=false;
+
+// Attention = something the user must act on (LND down or flags missing).
+// A merely-still-starting LNDK or a missing channel does not nag configured users.
+function setupNeedsAttention(s){return !!(s&&s.steps&&(!s.steps.lnd_connected||!s.steps.bolt12_flags));}
+
+function suItem(state,title,desc){
+  const ic=state==='ok'?'✓':state==='wait'?'…':'○';
+  const cls=state==='ok'?'su-ok':state==='wait'?'su-wait':'su-todo';
+  return `<div class="su-item"><div class="su-ic ${cls}">${ic}</div><div><div class="su-t">${esc(title)}</div><div class="su-d">${desc}</div></div></div>`;
+}
+
+function renderSetup(d){
+  const s=d.setup||{},st=s.steps||{};
+  const flagState=st.bolt12_flags?'ok':(st.lnd_connected?'todo':'wait');
+  const items=[
+    suItem(st.lnd_connected?'ok':'todo','Nœud LND connecté', st.lnd_connected?'Ton app Lightning répond.':'Démarre l\'app Lightning et attends sa synchronisation.'),
+    suItem(flagState,'Flags BOLT12 activés', st.bolt12_flags?'Les 3 flags onion-message sont en place.':'À activer via la commande ci-dessous (une seule fois).'),
+    suItem(st.lndk_ready?'ok':'wait','LNDK prêt', st.lndk_ready?'Le moteur BOLT12 est connecté.':'Démarre tout seul après l\'activation des flags.'),
+    suItem(st.public_channel?'ok':'wait','Canal public (pour recevoir)', st.public_channel?'Au moins un canal public actif.':'Recommandé : ≥1 canal public pour construire un blinded path.'),
+    suItem(st.bolt12_peer?'ok':'wait','Pair compatible BOLT12 (pour recevoir)', st.bolt12_peer?'Un pair relaie les onion messages.':'Recommandé : un canal vers un nœud BOLT12 (ex. ACINQ).'),
+  ];
+  document.getElementById('setup-checklist').innerHTML=items.join('');
+
+  const act=document.getElementById('setup-action');
+  const note=document.getElementById('setup-note');
+  if(s.complete){
+    _setupComplete=true;
+    let extra='';
+    if(!st.public_channel||!st.bolt12_peer){
+      extra=`<div class="su-d" style="margin-top:12px">Pour <strong>recevoir</strong>, ouvre un canal public vers un nœud BOLT12 comme ACINQ :</div>
+        <div class="su-cmd">${esc(ACINQ_PEER)}</div>
+        <button class="btn btn-g" onclick="copyStr(ACINQ_PEER)" style="font-size:12px;padding:8px 12px">Copier le nœud ACINQ</button>`;
+    }
+    act.innerHTML=`<div style="text-align:center;padding:8px 0 2px"><div style="font-size:30px">🎉</div><div style="font-size:15px;font-weight:700;color:#4ade80;margin:6px 0">BOLT12 est prêt !</div><div class="su-d">Tu peux créer et recevoir des offres.</div></div>${extra}`;
+    note.style.display='none';
+    document.getElementById('setup-recheck').textContent='Terminé';
+  } else if(!st.lnd_connected){
+    _setupComplete=false;
+    act.innerHTML=`<div class="su-d" style="padding:6px 2px">⏳ En attente de LND. Vérifie que l'app <strong>Lightning</strong> est démarrée et synchronisée — cette fenêtre se mettra à jour toute seule.</div>`;
+    note.style.display='';
+  } else if(!st.bolt12_flags){
+    _setupComplete=false;
+    const where=s.config_source?` <span style="opacity:.7">(détecté : <code>${esc(s.config_source)}</code>)</span>`:'';
+    act.innerHTML=`<div class="su-d" style="margin-bottom:6px"><strong>Étape unique</strong> — connecte-toi en SSH à ton Umbrel et lance cette commande${where} :</div>
+      <div class="su-cmd">${esc(SETUP_CMD)}</div>
+      <button class="btn btn-p" onclick="copyStr(SETUP_CMD)" style="font-size:13px"><svg viewBox="0 0 20 20" fill="currentColor" style="width:14px;height:14px"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"/><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"/></svg>Copier la commande</button>
+      <div class="su-d" style="margin-top:8px">Elle ajoute 3 flags à LND et le redémarre (~30 s). La fenêtre passera au vert automatiquement. 🔄</div>`;
+    note.style.display='';
+  } else {
+    _setupComplete=false;
+    act.innerHTML=`<div class="su-d" style="padding:6px 2px">⏳ Flags activés ! LNDK se connecte… ça passe au vert dans quelques instants.</div>`;
+    note.style.display='';
+  }
+}
+
+function updateSetupBanner(s){
+  const b=document.getElementById('setup-banner');
+  if(b) b.style.display=setupNeedsAttention(s)?'':'none';
+}
+
+async function pollSetup(){
+  let d=null;
+  try{ d=await api('/diagnostic'); }catch(e){ /* keep wizard open, retry */ }
+  if(d){ renderSetup(d); updateSetupBanner(d.setup); }
+  if(_setupOpen && !(d&&d.setup&&d.setup.complete)){
+    clearTimeout(_setupTimer);
+    _setupTimer=setTimeout(pollSetup,5000);
+  }
+}
+function pollSetupOnce(){ if(_setupComplete){ closeSetup(); return; } pollSetup(); }
+
+function openSetup(){
+  _setupOpen=true; _setupComplete=false;
+  document.getElementById('setup-recheck').textContent='Re-vérifier';
+  document.getElementById('setup-note').style.display='';
+  document.getElementById('setup-ov').classList.add('show');
+  pollSetup();
+}
+function closeSetup(){
+  _setupOpen=false; clearTimeout(_setupTimer);
+  document.getElementById('setup-ov').classList.remove('show');
+}
+
+async function checkSetupGate(){
+  try{
+    const d=await api('/diagnostic');
+    updateSetupBanner(d.setup);
+    if(setupNeedsAttention(d.setup)) openSetup();
+  }catch(e){ /* diagnostic needs LND/auth; ignore on gate */ }
 }
 
 // ── OFFERS ──

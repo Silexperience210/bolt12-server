@@ -110,23 +110,29 @@ async function main() {
   try {
     info = await lndRestGet('/v1/getinfo');
   } catch (e) {
-    fatal(`Cannot reach LND REST API at ${LND_REST_HOST}: ${e.message}`);
+    // Degraded boot: start anyway so the dashboard setup wizard can guide the user.
+    log('warn', `Cannot reach LND REST API at ${LND_REST_HOST} yet: ${e.message}. Starting anyway — the dashboard will guide setup.`);
+    return;
   }
   log('ok', `LND connected: ${info.alias || '?'} (${info.version || '?'})`);
 
   if (!info.synced_to_chain) log('warn', 'LND is not yet synced to chain. Payments will fail until sync completes.');
   if (!info.synced_to_graph) log('warn', 'LND is not yet synced to graph. Routes may be unreliable.');
 
+  // Missing BOLT12 flags is no longer fatal: the server boots in degraded mode and
+  // the dashboard wizard shows the one-time setup-lnd-flags.sh command + live status.
   const flags = checkLndBolt12Flags();
   if (!flags.flags) {
-    fatal(`Cannot detect BOLT12 protocol flags: ${flags.error}. Run setup-lnd-flags.sh on the Umbrel host and restart the Lightning app.`);
+    log('warn', `Cannot detect BOLT12 protocol flags: ${flags.error}. Run setup-lnd-flags.sh on the Umbrel host — the dashboard will guide you.`);
+  } else {
+    const expected = { 'protocol.custom-message': 513, 'protocol.custom-nodeann': 39, 'protocol.custom-init': 39 };
+    const missing = Object.entries(expected).filter(([k, v]) => Number(flags.flags[k]) !== v);
+    if (missing.length) {
+      log('warn', `Missing BOLT12 protocol flags in ${flags.source}: ${missing.map(([k, v]) => `${k}=${v}`).join(', ')}. Run setup-lnd-flags.sh on the Umbrel host — the dashboard will guide you.`);
+    } else {
+      log('ok', `BOLT12 protocol flags OK (${flags.source})`);
+    }
   }
-  const expected = { 'protocol.custom-message': 513, 'protocol.custom-nodeann': 39, 'protocol.custom-init': 39 };
-  const missing = Object.entries(expected).filter(([k, v]) => Number(flags.flags[k]) !== v);
-  if (missing.length) {
-    fatal(`Missing BOLT12 protocol flags in ${flags.source}: ${missing.map(([k, v]) => `${k}=${v}`).join(', ')}. Run setup-lnd-flags.sh on the Umbrel host and restart the Lightning app.`);
-  }
-  log('ok', `BOLT12 protocol flags OK (${flags.source})`);
 
   const channels = await lndRestGet('/v1/channels').catch(() => ({ channels: [] }));
   const chans = Array.isArray(channels.channels) ? channels.channels : [];
