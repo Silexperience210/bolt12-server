@@ -41,7 +41,7 @@ services:
 
   web:
     container_name: silex-bolt12-server-web
-    image: ghcr.io/silexperience210/bolt12-server:2.2.3
+    image: ghcr.io/silexperience210/bolt12-server:2.2.4
     restart: unless-stopped
     stop_grace_period: 1m
     depends_on:

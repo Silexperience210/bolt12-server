@@ -2,7 +2,7 @@ manifestVersion: 1.1
 id: silex-bolt12-server
 category: bitcoin
 name: Bolt12 Server
-version: "2.2.3"
+version: "2.2.4"
 tagline: BOLT12 offers + Lightning Address — LNDK bundled, one-time LND flags setup
 icon: https://raw.githubusercontent.com/Silexperience210/bolt12-server/main/silex-bolt12-server/icon.svg
 description: >-
@@ -68,6 +68,16 @@ defaultPassword: ""
 submitter: silexperience210
 submission: https://github.com/Silexperience210/bolt12-server
 releaseNotes: >-
+  v2.2.4 — Guided setup wizard
+
+  - New: a setup assistant opens on first run when BOLT12 isn't enabled yet.
+    It shows the one-time SSH command to copy, and a live checklist (LND, flags,
+    LNDK, public channel, BOLT12 peer) that turns green on its own as each
+    prerequisite is met — no manual refresh.
+  - The app no longer crash-loops when the BOLT12 flags are missing: it starts
+    in a guided mode so you can complete setup from the dashboard.
+
+
   v2.2.3 — Amount unit fix
 
   - Fix: offer and invoice amounts were sent to LNDK in satoshis but interpreted

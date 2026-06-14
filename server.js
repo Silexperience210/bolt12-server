@@ -574,6 +574,12 @@ function hasOnionMessageSupport(features) {
   return !!features['38'] || !!features['39'];
 }
 
+const EXPECTED_BOLT12_FLAGS = { 'protocol.custom-message': 513, 'protocol.custom-nodeann': 39, 'protocol.custom-init': 39 };
+function bolt12FlagsOk(flags) {
+  return !!(flags && flags.flags) &&
+    Object.entries(EXPECTED_BOLT12_FLAGS).every(([k, v]) => Number(flags.flags[k]) === v);
+}
+
 app.get('/api/v1/diagnostic', auth, async (req, res) => {
   try {
     const [info, channels, peers] = await Promise.all([
@@ -611,14 +617,39 @@ app.get('/api/v1/diagnostic', auth, async (req, res) => {
         ready: lndkReady,
         host: LNDK_HOST,
       },
+      // Drives the dashboard onboarding wizard. `complete` covers the blockers
+      // (flags + LNDK); a public channel and BOLT12 peer are recommended for receiving.
+      setup: {
+        config_source: flags.source || null,
+        complete: bolt12FlagsOk(flags) && lndkReady,
+        steps: {
+          lnd_connected:   true,
+          bolt12_flags:    bolt12FlagsOk(flags),
+          lndk_ready:      lndkReady,
+          public_channel:  publicChannels.length > 0,
+          bolt12_peer:     bolt12Peers.length > 0,
+        },
+      },
     });
   } catch (err) {
+    const flags = checkLndBolt12Flags();
     res.status(503).json({
       success: false,
       error: err.message,
       lnd: { connected: false },
-      bolt12_flags: checkLndBolt12Flags(),
+      bolt12_flags: flags,
       lndk: { ready: lndkReady, host: LNDK_HOST },
+      setup: {
+        config_source: flags.source || null,
+        complete: false,
+        steps: {
+          lnd_connected:   false,
+          bolt12_flags:    bolt12FlagsOk(flags),
+          lndk_ready:      lndkReady,
+          public_channel:  false,
+          bolt12_peer:     false,
+        },
+      },
     });
   }
 });
