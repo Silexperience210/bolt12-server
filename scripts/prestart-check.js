@@ -69,7 +69,7 @@ function checkLndBolt12Flags() {
       const text = fs.readFileSync(p, 'utf8');
       const flags = {};
       for (const key of Object.keys(expected)) {
-        const re = new RegExp(`^${key.replace(/\./g, '\\.')}\s*=\s*(\\d+)`, 'm');
+        const re = new RegExp(`^${key.replace(/\./g, '\\.')}\\s*=\\s*(\\d+)`, 'm');
         const m = text.match(re);
         flags[key] = m ? Number(m[1]) : null;
       }

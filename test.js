@@ -15,7 +15,7 @@ const http  = require('http');
 const https = require('https');
 
 const BASE    = process.argv[2] || 'http://localhost:3001';
-const API_KEY = process.argv[3] || '';
+let   API_KEY = process.argv[3] || '';
 
 // ─── colours ────────────────────────────────────────────────────────────────
 const C = {
@@ -122,8 +122,8 @@ async function run() {
     if (res.status === 200) {
       log(true, 'GET /api/v1/config (local) → 200');
       if (res.body?.apiKey && !API_KEY) {
-        // Auto-capture key for remaining tests
-        process.env._captured_key = res.body.apiKey;
+        // Auto-capture key so the remaining authed tests can run
+        API_KEY = res.body.apiKey;
         console.log(`  ${C.yellow}→ API key captured automatically${C.reset}`);
       }
     } else if (res.status === 403) {
@@ -299,7 +299,7 @@ async function run() {
   res = await withTimeout(POST('/api/v1/invoices', {}), 5000);
   if (!res.__timeout) expectStatus('POST /api/v1/invoices with no data → 400', res, 400);
 
-  res = await withTimeout(POST('/api/v1/invoices', { amount: 1000, memo: 'Test invoice' }), 10000);
+  res = await withTimeout(POST('/api/v1/invoices', { amount: 1000, description: 'Test invoice' }), 10000);
   if (res.__timeout) { log('warn', 'POST /api/v1/invoices timed out (LND may not be reachable)'); }
   else if (res.status === 200 || res.status === 201) {
     log(true, 'POST /api/v1/invoices → 200');

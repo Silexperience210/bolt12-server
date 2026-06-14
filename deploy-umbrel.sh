@@ -1,133 +1,110 @@
 #!/bin/bash
 # ============================================================
-# Deploy Bolt12 Server to Umbrel via SSH
-# Usage: bash deploy-umbrel.sh [umbrel-ip]
+# Deploy Bolt12 Server to an Umbrel node via SSH (standalone, no app store).
+# Usage: bash deploy-umbrel.sh [umbrel-ip] [ssh-user]
+#
+# Uses silex-bolt12-server/docker-compose.standalone.yml with the prebuilt
+# ghcr.io images — no local build or source transfer required. Your LND node
+# must expose gRPC :10009 and REST :8080 on the LAN (Umbrel's Lightning app
+# does this by default).
 # ============================================================
+set -euo pipefail
 
 UMBREL_IP="${1:-192.168.1.55}"
-UMBREL_USER="umbrel"
-REMOTE_DIR="~/bolt12-server"
+UMBREL_USER="${2:-umbrel}"
+WEB_PORT="${WEB_PORT:-3001}"
+REMOTE_DIR="bolt12-server"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-COMPOSE_FILE="silex-bolt12-server/docker-compose.yml"
+COMPOSE_SRC="${SCRIPT_DIR}/silex-bolt12-server/docker-compose.standalone.yml"
+SSH="ssh ${UMBREL_USER}@${UMBREL_IP}"
 
 echo "================================================"
-echo "   BOLT12 SERVER - DEPLOY TO UMBREL"
+echo "   BOLT12 SERVER - DEPLOY TO UMBREL (standalone)"
 echo "================================================"
-echo "Target: ${UMBREL_USER}@${UMBREL_IP}:${REMOTE_DIR}"
+echo "Target: ${UMBREL_USER}@${UMBREL_IP}  (web port ${WEB_PORT})"
 echo ""
 
-# ---- 1. Vérification connexion SSH ----
+# ---- 1. SSH connectivity ----
 echo "[1/5] Testing SSH connection..."
 if ! ssh -o ConnectTimeout=5 -o BatchMode=yes "${UMBREL_USER}@${UMBREL_IP}" "echo ok" 2>/dev/null; then
-    echo ""
-    echo "SSH key auth not configured. Setting up SSH key..."
-    echo "You'll be asked for the password once."
-    ssh-copy-id "${UMBREL_USER}@${UMBREL_IP}" 2>/dev/null || {
-        echo "[INFO] ssh-copy-id not available, continuing with password auth"
-    }
+    echo "SSH key auth not configured — setting it up (you'll be asked for the password once)."
+    ssh-copy-id "${UMBREL_USER}@${UMBREL_IP}" || echo "[INFO] ssh-copy-id unavailable; continuing with password auth."
 fi
 
-# ---- 2. Création dossier remote ----
+# ---- 2. Locate LND's data directory on the node ----
 echo ""
-echo "[2/5] Creating remote directory..."
-ssh "${UMBREL_USER}@${UMBREL_IP}" "mkdir -p ${REMOTE_DIR}/proto ${REMOTE_DIR}/public"
+echo "[2/5] Locating LND data directory..."
+LND_DATA_DIR=$($SSH '
+    for d in \
+        "$HOME/umbrel/app-data/lightning/data/lnd" \
+        "/home/umbrel/umbrel/app-data/lightning/data/lnd" \
+        "$HOME/umbrel/lnd"; do
+        if [ -f "$d/tls.cert" ]; then echo "$d"; exit 0; fi
+    done
+    exit 1
+') || { echo "[ERROR] Could not find LND data dir (tls.cert) on the node. Is the Lightning app installed?"; exit 1; }
+echo "[OK] LND data dir: ${LND_DATA_DIR}"
 
-# ---- 3. Transfert des fichiers ----
+# ---- 3. Remote dir + reuse-or-generate API key ----
 echo ""
-echo "[3/5] Transferring files..."
-scp "${SCRIPT_DIR}/server.js"          "${UMBREL_USER}@${UMBREL_IP}:${REMOTE_DIR}/"
-scp "${SCRIPT_DIR}/package.json"       "${UMBREL_USER}@${UMBREL_IP}:${REMOTE_DIR}/"
-scp "${SCRIPT_DIR}/Dockerfile"         "${UMBREL_USER}@${UMBREL_IP}:${REMOTE_DIR}/"
-scp "${SCRIPT_DIR}/${COMPOSE_FILE}"    "${UMBREL_USER}@${UMBREL_IP}:${REMOTE_DIR}/docker-compose.yml"
-scp "${SCRIPT_DIR}/proto/lndkrpc.proto" "${UMBREL_USER}@${UMBREL_IP}:${REMOTE_DIR}/proto/"
-
-# Copier le public/ si présent
-if [ -d "${SCRIPT_DIR}/public" ]; then
-    scp -r "${SCRIPT_DIR}/public/." "${UMBREL_USER}@${UMBREL_IP}:${REMOTE_DIR}/public/"
-fi
-
-echo "[OK] Files transferred"
-
-# ---- 4. Configuration .env sur Umbrel ----
-echo ""
-echo "[4/5] Configuring .env on Umbrel..."
-
-# Générer une API key si pas déjà définie
-API_KEY=$(ssh "${UMBREL_USER}@${UMBREL_IP}" "
-    if [ -f ${REMOTE_DIR}/.env ] && grep -q '^API_KEY=' ${REMOTE_DIR}/.env; then
+echo "[3/5] Preparing remote directory and API key..."
+$SSH "mkdir -p ${REMOTE_DIR}"
+API_KEY=$($SSH "
+    if [ -f ${REMOTE_DIR}/.env ] && grep -q '^API_KEY=.\\+' ${REMOTE_DIR}/.env; then
         grep '^API_KEY=' ${REMOTE_DIR}/.env | cut -d= -f2
     else
-        node -e 'const c=require(\"crypto\"); console.log(c.randomBytes(32).toString(\"hex\"))' 2>/dev/null \\
+        node -e 'console.log(require(\"crypto\").randomBytes(32).toString(\"hex\"))' 2>/dev/null \
             || head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n'
     fi
 ")
 
-# Note: unquoted heredoc delimiter allows ${API_KEY} to expand.
-# All other variables are written literally (no $ in the template).
-ssh "${UMBREL_USER}@${UMBREL_IP}" "cat > ${REMOTE_DIR}/.env << ENVEOF
-# Bolt12 Server - Auto-generated config
-NODE_ENV=production
-PORT=3001
-
-# LND
-LND_REST_HOST=host.docker.internal:8080
-LND_TLS_PATH=/lnd/tls.cert
-LND_MACAROON_PATH=/lnd/data/chain/bitcoin/mainnet/admin.macaroon
-
-# LNDK
-LNDK_HOST=host.docker.internal:10010
-LNDK_TLS_PATH=/lndk-data/tls-cert.pem
-LNDK_MACAROON_PATH=/lndk-data/admin.macaroon
-
-# API Key (keep secret!)
-API_KEY=${API_KEY}
-ENVEOF"
-
-echo "[OK] .env configured"
-echo "[INFO] API Key: ${API_KEY:0:8}... (keep this secret)"
-
-# ---- 5. Pull, build et démarrage Docker ----
+# ---- 4. Transfer compose + write .env ----
 echo ""
-echo "[5/5] Pulling images and starting Docker container..."
-ssh "${UMBREL_USER}@${UMBREL_IP}" "
-    cd ${REMOTE_DIR}
-    docker compose down 2>/dev/null || true
-    docker compose pull
-    docker compose up -d --build
-"
+echo "[4/5] Transferring compose file and writing .env..."
+scp -q "${COMPOSE_SRC}" "${UMBREL_USER}@${UMBREL_IP}:${REMOTE_DIR}/docker-compose.yml"
 
-# ---- Vérification ----
+# Unquoted heredoc so the variables below expand locally before being written.
+$SSH "cat > ${REMOTE_DIR}/.env" << ENVEOF
+# Bolt12 Server - generated by deploy-umbrel.sh
+LND_HOST=${UMBREL_IP}
+LND_DATA_DIR=${LND_DATA_DIR}
+WEB_PORT=${WEB_PORT}
+API_KEY=${API_KEY}
+LNURL_DOMAIN=
+LNURL_USERNAME=pay
+LNURL_MIN_MSATS=1000
+LNURL_MAX_MSATS=10000000000
+ENVEOF
+echo "[OK] .env written  (API key: ${API_KEY:0:8}…)"
+
+# ---- 5. Pull images and start ----
+echo ""
+echo "[5/5] Pulling images and starting containers..."
+$SSH "cd ${REMOTE_DIR} && docker compose down 2>/dev/null || true && docker compose pull && docker compose up -d"
+
+# ---- Verification ----
 echo ""
 echo "================================================"
 echo "   VERIFICATION"
 echo "================================================"
-
-# Robust health check: retry a few times, then fall back to remote container status.
 HEALTH=""
 for attempt in 1 2 3 4 5; do
-    HEALTH=$(curl -sS --retry 2 --retry-delay 2 --max-time 5 "http://${UMBREL_IP}:3001/health" 2>/dev/null || true)
-    if echo "$HEALTH" | grep -q '"status":"ok"'; then
-        break
-    fi
-    echo "[INFO] Health check attempt ${attempt}/5 failed, retrying in 5s..."
+    HEALTH=$(curl -sS --max-time 5 "http://${UMBREL_IP}:${WEB_PORT}/health" 2>/dev/null || true)
+    echo "$HEALTH" | grep -q '"status":"ok"' && break
+    echo "[INFO] Health attempt ${attempt}/5 not ready yet, retrying in 5s..."
     sleep 5
 done
 
 if echo "$HEALTH" | grep -q '"status":"ok"'; then
     echo "[OK] Server is online!"
-    echo ""
-    echo "  Dashboard : http://${UMBREL_IP}:3001"
-    echo "  Health    : http://${UMBREL_IP}:3001/health"
+    echo "  Dashboard : http://${UMBREL_IP}:${WEB_PORT}"
+    echo "  Health    : http://${UMBREL_IP}:${WEB_PORT}/health"
     echo "  API Key   : ${API_KEY}"
 else
-    echo "[!] Server not responding yet. Checking remote container status..."
-    ssh "${UMBREL_USER}@${UMBREL_IP}" "docker compose -f ${REMOTE_DIR}/docker-compose.yml ps" 2>/dev/null || true
+    echo "[!] Not responding yet. Container status:"
+    $SSH "cd ${REMOTE_DIR} && docker compose ps" || true
     echo ""
-    echo "Check logs with:"
-    echo "    ssh ${UMBREL_USER}@${UMBREL_IP} 'docker logs silex-bolt12-server-server-1'"
-    echo ""
-    echo "Or wait 30s and test:"
-    echo "    curl http://${UMBREL_IP}:3001/health"
+    echo "Logs:  ssh ${UMBREL_USER}@${UMBREL_IP} 'cd ${REMOTE_DIR} && docker compose logs --tail=50 web lndk'"
 fi
 
 echo ""
