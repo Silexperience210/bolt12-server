@@ -1,0 +1,83 @@
+# Standalone Compose for manual SSH deploys (deploy-umbrel.sh).
+#
+# This is NOT the Umbrel community-app-store file (docker-compose.yml). That one
+# relies on the Umbrel runtime to inject the `app_proxy` image and the
+# APP_LIGHTNING_NODE_* variables, so it cannot be run with a bare
+# `docker compose up`. This file is fully self-contained instead:
+#   - no app_proxy (the web port is published directly)
+#   - LND is reached over the LAN IP so its TLS cert SANs match
+#   - required/optional values come from a generated .env
+#
+# Required env (written by deploy-umbrel.sh):
+#   LND_HOST       LAN IP of the node running LND (gRPC :10009, REST :8080 exposed)
+#   LND_DATA_DIR   host path of LND's data dir (contains tls.cert + data/chain/...)
+# Optional env:
+#   WEB_PORT (3001), API_KEY (auto-generated if empty), LNURL_*
+
+services:
+  lndk:
+    image: ghcr.io/silexperience210/lndk:v0.3.0
+    user: root
+    restart: unless-stopped
+    stop_grace_period: 1m
+    environment:
+      LND_WAIT_HOST: "${LND_HOST:?set LND_HOST to the LAN IP of your LND node}"
+      LND_WAIT_PORT: "10009"
+      LND_WAIT_TIMEOUT: "180"
+    volumes:
+      - ${LND_DATA_DIR:?set LND_DATA_DIR to your LND data directory}:/lnd:ro
+      - lndk-data:/home/lndk/.lndk
+    command:
+      - "--address=https://${LND_HOST}:10009"
+      - "--cert-path=/lnd/tls.cert"
+      - "--macaroon-path=/lnd/data/chain/bitcoin/mainnet/admin.macaroon"
+      - "--grpc-host=0.0.0.0"
+      - "--grpc-port=10010"
+      - "--data-dir=/home/lndk/.lndk"
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "10010"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  web:
+    container_name: bolt12-server-web
+    image: ghcr.io/silexperience210/bolt12-server:2.2.1
+    restart: unless-stopped
+    stop_grace_period: 1m
+    depends_on:
+      lndk:
+        condition: service_healthy
+    ports:
+      - "${WEB_PORT:-3001}:3001"
+    volumes:
+      - ${LND_DATA_DIR:?set LND_DATA_DIR to your LND data directory}:/lnd:ro
+      - ${LND_DATA_DIR}/../lightning:/lightning:ro
+      - lndk-data:/lndk-data:ro
+      - web-data:/app/data
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+      LND_TLS_PATH: /lnd/tls.cert
+      LND_MACAROON_PATH: /lnd/data/chain/bitcoin/mainnet/admin.macaroon
+      LND_REST_HOST: "${LND_HOST}:8080"
+      LNDK_HOST: lndk:10010
+      LNDK_TLS_PATH: /lndk-data/tls-cert.pem
+      # LNDK forwards this macaroon to LND, so it must be an LND macaroon.
+      LNDK_MACAROON_PATH: /lnd/data/chain/bitcoin/mainnet/admin.macaroon
+      API_KEY: "${API_KEY:-}"
+      LNURL_DOMAIN: "${LNURL_DOMAIN:-}"
+      LNURL_USERNAME: "${LNURL_USERNAME:-pay}"
+      LNURL_MIN_MSATS: "${LNURL_MIN_MSATS:-1000}"
+      LNURL_MAX_MSATS: "${LNURL_MAX_MSATS:-10000000000}"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  lndk-data:
+  web-data:

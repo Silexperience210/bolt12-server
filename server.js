@@ -18,6 +18,9 @@ const APP_VERSION = require('./package.json').version;
 
 const app = express();
 app.set('trust proxy', 1); // Umbrel app_proxy sits in front
+// res.json() uses JSON.stringify, which throws on BigInt. Serialize BigInt as a
+// decimal string so endpoints returning parsed amounts (e.g. offer creation) work.
+app.set('json replacer', (key, value) => typeof value === 'bigint' ? value.toString() : value);
 
 // ============================================
 // SECURITY HEADERS
@@ -61,7 +64,7 @@ const readLimiter = rateLimit({
 
 app.use(limiter);
 app.use(express.json({ limit: '1mb' }));
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // ============================================
 // CONFIGURATION
@@ -71,7 +74,10 @@ const LND_TLS_PATH       = process.env.LND_TLS_PATH;
 const LND_MACAROON_PATH  = process.env.LND_MACAROON_PATH;
 const LND_REST_HOST      = process.env.LND_REST_HOST   || 'host.docker.internal:8080';
 const LNDK_HOST          = process.env.LNDK_HOST       || 'host.docker.internal:10010';
-const LNDK_MACAROON_PATH = process.env.LNDK_MACAROON_PATH || '/lndk-data/admin.macaroon';
+// LNDK's gRPC server does NOT issue its own macaroon: it requires a "macaroon"
+// in request metadata and forwards it to LND as the connection credential. So
+// this must point at an LND macaroon (e.g. admin.macaroon), not an LNDK file.
+const LNDK_MACAROON_PATH = process.env.LNDK_MACAROON_PATH || '/lnd/data/chain/bitcoin/mainnet/admin.macaroon';
 const DATA_DIR           = path.join(__dirname, 'data');
 const OFFERS_FILE        = path.join(DATA_DIR, 'offers.json');
 const KEY_FILE           = path.join(DATA_DIR, 'api_key.txt');
@@ -419,7 +425,7 @@ function initLndkClient() {
       cb(null, m);
     });
 
-    const LNDK_TLS = process.env.LNDK_TLS_PATH || '/lndk-data/tls.cert';
+    const LNDK_TLS = process.env.LNDK_TLS_PATH || '/lndk-data/tls-cert.pem';
     if (!fs.existsSync(LNDK_TLS)) {
       console.error(`❌ LNDK TLS cert not found: ${LNDK_TLS}`);
       process.exit(1);
@@ -457,10 +463,14 @@ function scheduleLndkRetry(attempt = 1) {
 // ============================================
 // MIDDLEWARES
 // ============================================
+const API_KEY_BUF = Buffer.from(API_KEY, 'utf8');
 function auth(req, res, next) {
-  const provided = req.headers['x-api-key'] || '';
-  if (provided.length !== API_KEY.length ||
-      !crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(API_KEY)))
+  // Compare byte lengths (not string length): a header with high/multibyte chars
+  // can share API_KEY's string length yet differ in byte length, which would make
+  // timingSafeEqual throw. Guarding on byte length keeps it constant-time and safe.
+  const provided = Buffer.from(req.headers['x-api-key'] || '', 'utf8');
+  if (provided.length !== API_KEY_BUF.length ||
+      !crypto.timingSafeEqual(provided, API_KEY_BUF))
     return res.status(401).json({ success: false, error: 'Unauthorized' });
   next();
 }
@@ -630,6 +640,10 @@ app.post('/api/v1/offers', apiLimiter, auth, (req, res) => {
   } catch (err) {
     return res.status(400).json({ success: false, error: err.message });
   }
+
+  // "0 = libre" in the UI: a zero amount means an amountless (payer-chooses) offer,
+  // so omit it from the LNDK request rather than creating a 0-msat offer.
+  if (amountB === 0n) amountB = null;
 
   const request = { description: desc };
   // gRPC int64/uint64 fields expect strings (longs: String in protoLoader)
