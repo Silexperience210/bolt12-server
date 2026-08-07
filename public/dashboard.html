@@ -113,6 +113,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 @media(max-width:560px){.row2{grid-template-columns:1fr}}
 label{display:block;font-size:10px;font-weight:700;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.6px}
 label .req{color:var(--red)}
+label .opt{color:var(--pL);font-weight:600;font-size:.85em;opacity:.85}
 .inp{width:100%;background:rgba(0,0,0,.35);border:1px solid rgba(139,92,246,.2);border-radius:11px;padding:11px 14px;color:var(--text);font-size:14px;outline:none;transition:border-color .2s,box-shadow .2s;font-family:inherit}
 .inp:focus{border-color:var(--p);box-shadow:0 0 0 3px rgba(139,92,246,.12),0 0 18px rgba(139,92,246,.07)}
 .inp::placeholder{color:rgba(107,107,138,.65)}
@@ -490,8 +491,8 @@ textarea.inp{resize:vertical;min-height:80px;line-height:1.5}
       </div>
       <div class="row2">
         <div>
-          <label>Montant (sats) <span class="req">*</span></label>
-          <input class="inp" type="number" id="o-amount" placeholder="Montant en sats (requis)" min="1">
+          <label>Montant (sats) <span class="opt">facultatif</span></label>
+          <input class="inp" type="number" id="o-amount" placeholder="Montant en sats — vide = montant libre" min="1">
         </div>
         <div>
           <label>Description <span class="req">*</span></label>
@@ -1266,14 +1267,17 @@ async function createOffer(){
   const amount=parseInt(document.getElementById('o-amount').value)||0;
   const desc=document.getElementById('o-desc').value.trim();
   if(!desc){toast('Description obligatoire','err');return;}
-  if(amount<1||amount>MAX_SATS){toast(`Montant requis : 1 à ${fmt(MAX_SATS)} sats (LNDK ne gère pas les offres sans montant)`,'err');return;}
+  // Laisser le champ vide crée une offre à montant libre : le payeur choisit
+  // combien envoyer. Indispensable pour les payouts variables (pool OCEAN).
+  if(amount<0||amount>MAX_SATS){toast(`Montant invalide : laissez vide pour une offre à montant libre, sinon 1 à ${fmt(MAX_SATS)} sats`,'err');return;}
   const issuer=document.getElementById('o-issuer').value.trim();
   const expiry=parseInt(document.getElementById('o-expiry').value)||0;
   const quantity=parseInt(document.getElementById('o-quantity').value)||0;
   const btn=document.getElementById('create-btn');
   btn.disabled=true;btn.innerHTML='<div class="spin"></div> Génération…';
   try{
-    const body={amount,description:desc};
+    const body={description:desc};
+    if(amount>0) body.amount=amount; // omis => offre à montant libre
     if(issuer) body.issuer=issuer;
     if(expiry) body.expiry=expiry;
     if(quantity) body.quantity=quantity;

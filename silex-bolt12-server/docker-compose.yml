@@ -10,7 +10,7 @@ services:
     # NOTE: app_proxy is injected by Umbrel itself; do not add restart/image here.
 
   lndk:
-    image: ghcr.io/silexperience210/lndk:v0.3.0
+    image: ghcr.io/silexperience210/lndk:master-e0b2344
     # Run as root so LNDK can write to the named volume regardless of host UID.
     user: root
     restart: unless-stopped
@@ -41,7 +41,7 @@ services:
 
   web:
     container_name: silex-bolt12-server-web
-    image: ghcr.io/silexperience210/bolt12-server:2.2.4
+    image: ghcr.io/silexperience210/bolt12-server:2.3.0
     restart: unless-stopped
     stop_grace_period: 1m
     depends_on:

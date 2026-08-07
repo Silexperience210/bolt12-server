@@ -16,7 +16,7 @@
 
 services:
   lndk:
-    image: ghcr.io/silexperience210/lndk:v0.3.0
+    image: ghcr.io/silexperience210/lndk:master-e0b2344
     user: root
     restart: unless-stopped
     stop_grace_period: 1m
@@ -43,7 +43,7 @@ services:
 
   web:
     container_name: bolt12-server-web
-    image: ghcr.io/silexperience210/bolt12-server:2.2.4
+    image: ghcr.io/silexperience210/bolt12-server:2.3.0
     restart: unless-stopped
     stop_grace_period: 1m
     depends_on:
