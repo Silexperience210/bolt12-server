@@ -680,16 +680,20 @@ app.post('/api/v1/offers', apiLimiter, auth, (req, res) => {
     return res.status(400).json({ success: false, error: err.message });
   }
 
-  // LNDK v0.3.0 always encodes an amount in the offer (no amountless mode), and a
-  // 0-amount offer cannot be paid by wallets — so require a positive amount.
-  if (amountB === null || amountB === 0n) {
-    return res.status(400).json({ success: false, error: 'amount (in sats) is required and must be greater than 0 — LNDK does not support amountless offers' });
+  // Per BOLT 12 (bolts #1316) offer_amount must be greater than zero when
+  // present, so an explicit 0 is rejected. Omitting the amount entirely is
+  // valid and yields an amountless offer where the payer decides how much to
+  // send — required for variable payouts such as the OCEAN mining pool.
+  // Requires LNDK with PR #253; see lndk/Dockerfile for the pinned commit.
+  if (amountB === 0n) {
+    return res.status(400).json({ success: false, error: 'amount must be greater than 0 — omit it entirely to create an amountless offer' });
   }
 
   const request = { description: desc };
   // gRPC int64/uint64 fields expect strings (longs: String in protoLoader).
   // BOLT12 amounts are in millisatoshis; this API works in sats.
-  request.amount = satsToMsats(amountB).toString();
+  // Leaving `amount` unset makes LNDK omit offer_amount from the offer.
+  if (amountB !== null) request.amount = satsToMsats(amountB).toString();
   if (expiryB   !== null) request.expiry   = expiryB.toString();
   if (issuerV)            request.issuer   = issuerV;
   if (quantityB !== null) request.quantity = quantityB.toString();

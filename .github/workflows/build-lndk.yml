@@ -39,7 +39,10 @@ jobs:
           images: ghcr.io/silexperience210/lndk
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=v0.3.0
+            # Built from lndk master commit e0b2344, not a tagged release.
+            # PR #253 (amountless offers) is not in any release yet; retag
+            # to the release version once one ships that contains it.
+            type=raw,value=master-e0b2344
             type=sha,prefix=sha-
 
       - name: Build and push (amd64 + arm64)
