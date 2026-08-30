@@ -10,7 +10,8 @@ services:
     # NOTE: app_proxy is injected by Umbrel itself; do not add restart/image here.
 
   lndk:
-    image: ghcr.io/silexperience210/lndk:master-e0b2344
+    image: alex71btc/lndk:native-onion-messages-bolt12-v4
+    entrypoint: ["lndk"]
     # Run as root so LNDK can write to the named volume regardless of host UID.
     user: root
     restart: unless-stopped
@@ -33,7 +34,7 @@ services:
       - "--grpc-port=10010"
       - "--data-dir=/home/lndk/.lndk"
     healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "10010"]
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/10010"]
       interval: 15s
       timeout: 5s
       retries: 5

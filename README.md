@@ -89,6 +89,13 @@ Defaults to `192.168.1.55` if no IP provided.
 - LND v0.18.0+ with BOLT12 protocol flags (handled by `setup-lnd-flags.sh`)
 - At least one **public** Lightning channel with a peer that supports BOLT12 onion messages
 
+> **LND v0.21+** : ces versions gèrent les onion messages nativement (feature bit 39).
+> `setup-lnd-flags.sh` ne pose que `protocol.custom-message=513` sur ces versions —
+> ne **jamais** ajouter `protocol.custom-nodeann=39` / `protocol.custom-init=39`,
+> cela fait crasher LND au démarrage (`feature bit: 39 already set`).
+> L'image LNDK utilisée (`alex71btc/lndk:native-onion-messages-bolt12-v4`) embarque le
+> support du transport onion natif de LND v0.21 (PR lndk-org/lndk#266, non mergé).
+
 ---
 
 ## License

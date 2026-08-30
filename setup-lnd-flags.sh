@@ -87,9 +87,11 @@ if "lnd" not in data or not isinstance(data["lnd"], dict):
 
 flags = {
     "protocol.custom-message": "513",
-    "protocol.custom-nodeann": "39",
-    "protocol.custom-init": "39",
 }
+# NOTE: protocol.custom-nodeann=39 et protocol.custom-init=39 sont à NE PAS
+# poser sur LND v0.21+ : ces versions gèrent les onion messages nativement
+# (feature bit 39) et ajouter ces flags fait crasher LND au démarrage avec
+# "feature bit: 39 already set". Seul le type de message custom 513 est requis.
 
 changed = False
 for key, value in flags.items():
@@ -153,9 +155,8 @@ elif [ -f "$LND_CONF" ]; then
 
     FLAGS=(
         "protocol.custom-message=513"
-        "protocol.custom-nodeann=39"
-        "protocol.custom-init=39"
     )
+    # Voir note ci-dessus : pas de custom-nodeann/custom-init sur LND v0.21+.
 
     for FLAG in "${FLAGS[@]}"; do
         KEY="${FLAG%%=*}"
