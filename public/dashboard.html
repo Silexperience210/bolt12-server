@@ -1152,12 +1152,6 @@ async function loadBalance(){
 async function init(){
   checkHealth();
   setInterval(checkHealth,20000);
-  if(!KEY){
-    try{
-      const r=await fetch('/api/v1/config');
-      if(r.ok){const c=await r.json();if(c.apiKey){KEY=c.apiKey;sessionStorage.setItem('b12k',KEY);}}
-    }catch{}
-  }
   if(!KEY){showAuth();return;}
   loadBalance();
   loadOffers();

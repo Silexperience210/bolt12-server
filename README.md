@@ -44,7 +44,8 @@ Search for **Bolt12 Server** and click Install. LNDK starts automatically — no
 ## API
 
 All endpoints require `x-api-key` header (except `/health` and `/api/v1/public/*`).
-Your API key is visible at `http://umbrel.local:3043/api/v1/config` from your local network.
+Your API key is stored in `/app/data/api_key.txt` inside the container — read it with
+`docker exec <container> cat /app/data/api_key.txt` (NOT exposed over HTTP).
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|

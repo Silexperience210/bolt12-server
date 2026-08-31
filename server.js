@@ -91,7 +91,7 @@ if (!API_KEY) {
   } else {
     API_KEY = crypto.randomBytes(32).toString('hex');
     fs.writeFileSync(KEY_FILE, API_KEY, { mode: 0o600 });
-    console.log('🔑 API Key generated — visible via /api/v1/config on local network');
+    console.log('🔑 API Key generated — stored in /app/data/api_key.txt (read via docker exec, NOT exposed over HTTP)');
   }
 }
 
@@ -518,7 +518,7 @@ function isLocalAddress(ip) {
 app.get('/api/v1/config', (req, res) => {
   const raw = req.socket?.remoteAddress || req.connection?.remoteAddress || '';
   if (!isLocalAddress(raw)) return res.status(403).json({ success: false, error: 'Forbidden' });
-  res.json({ apiKey: API_KEY, lndkReady, version: APP_VERSION });
+  res.json({ lndkReady, version: APP_VERSION });
 });
 
 function checkLndBolt12Flags() {
