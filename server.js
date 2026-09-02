@@ -50,6 +50,10 @@ const limiter = rateLimit({
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
+  // Arena endpoints have their own per-session limiters and are called
+  // from browsers behind the Cloudflare tunnel (all requests share one
+  // source IP — a global per-IP cap would block every player at once).
+  skip: (req) => req.path.startsWith('/api/v1/arena') || req.path === '/health',
 });
 
 const apiLimiter = rateLimit({
@@ -1395,6 +1399,14 @@ const arenaLimiter = rateLimit({
   message: { success: false, error: 'Too many requests — slow down' },
 });
 
+// Read paths (status polling every 2s = 30/min, QR, health) get a
+// separate, higher ceiling than write paths (join/kill/withdraw).
+const arenaReadLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 120,
+  message: { success: false, error: 'Too many requests — slow down' },
+});
+
 // CORS for the game origin only (browser calls from silexperience.org)
 app.use((req, res, next) => {
   if (req.path === '/health' || req.path.startsWith('/api/v1/arena')) {
@@ -1472,7 +1484,7 @@ app.post('/api/v1/arena/join', arenaLimiter, async (req, res) => {
 });
 
 /** Session status: entry paid? frags credited? treasury pool? Public. */
-app.get('/api/v1/arena/status/:token', arenaLimiter, async (req, res) => {
+app.get('/api/v1/arena/status/:token', arenaReadLimiter, async (req, res) => {
   try {
     const result = await arenaUpdate(async (sessions) => {
       const found = arenaSessionByToken(sessions, req.params.token);
@@ -1560,7 +1572,7 @@ app.post('/api/v1/arena/kill', arenaLimiter, async (req, res) => {
 });
 
 /** QR of the entry invoice — public, token-gated (token IS the auth). */
-app.get('/api/v1/arena/qr/:token', arenaLimiter, async (req, res) => {
+app.get('/api/v1/arena/qr/:token', arenaReadLimiter, async (req, res) => {
   try {
     const sessions = await loadArenaSessions();
     const found = arenaSessionByToken(sessions, req.params.token);
