@@ -1539,6 +1539,27 @@ app.post('/api/v1/arena/kill', arenaLimiter, async (req, res) => {
   }
 });
 
+/** QR of the entry invoice — public, token-gated (token IS the auth). */
+app.get('/api/v1/arena/qr/:token', arenaLimiter, async (req, res) => {
+  try {
+    const sessions = await loadArenaSessions();
+    const found = arenaSessionByToken(sessions, req.params.token);
+    if (!found) return res.status(404).json({ success: false, error: 'Session not found' });
+    const size = Math.min(Math.max(parseInt(req.query.size) || 320, 160), 1000);
+    const buf = await QRCode.toBuffer(found.s.payment_request, {
+      type: 'png',
+      width: size,
+      margin: 2,
+      errorCorrectionLevel: 'M',
+    });
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'private, max-age=60');
+    res.send(buf);
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'QR generation failed' });
+  }
+});
+
 /** Withdraw credit by paying the player's BOLT11 invoice. Public but token-gated + capped. */
 app.post('/api/v1/arena/withdraw', arenaLimiter, async (req, res) => {
   const { session_token, payment_request } = req.body || {};
