@@ -266,6 +266,94 @@ async function isPrivateHost(urlStr) {
 const lndTlsCert  = fs.readFileSync(LND_TLS_PATH);
 const lndMacaroon = fs.readFileSync(LND_MACAROON_PATH).toString('hex');
 
+// ── LNbits (arena treasury) ──────────────────────────────────
+// The arena money lives in a dedicated LNbits wallet. The browser
+// never sees these keys — only invoices / LNURL strings.
+const LNBITS_URL          = (process.env.LNBITS_URL || 'http://lnbits_web_1:3007').replace(/\/$/, '');
+const ARENA_INKEY         = process.env.ARENA_LNBITS_INKEY;
+const ARENA_ADMINKEY      = process.env.ARENA_LNBITS_ADMINKEY;
+const ARENA_SWEEP_INKEY   = process.env.ARENA_SWEEP_INKEY; // "Boutique Silexperience" (margin sweep)
+const ARENA_FLOAT_CAP     = parseInt(process.env.ARENA_FLOAT_CAP_SATS || '20000', 10); // sweep above this
+const ARENA_FEE_RESERVE   = parseInt(process.env.ARENA_FEE_RESERVE_SATS || '300', 10);  // keep for routing fees
+
+if (!ARENA_INKEY || !ARENA_ADMINKEY) {
+  console.error('❌ ARENA_LNBITS_INKEY / ARENA_LNBITS_ADMINKEY required');
+  process.exit(1);
+}
+
+function lnbitsApi(path, key, body = null) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(path, LNBITS_URL);
+    const payload = body ? JSON.stringify(body) : null;
+    const req = http.request({
+      hostname: u.hostname,
+      port: u.port || 80,
+      path: u.pathname + u.search,
+      method: body ? 'POST' : 'GET',
+      headers: {
+        'X-Api-Key': key,
+        'Content-Type': 'application/json',
+      },
+    }, res => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        let parsed = null;
+        try { parsed = data ? JSON.parse(data) : {}; } catch { /* keep raw */ }
+        if (res.statusCode >= 400) {
+          return reject(new Error(`LNbits ${res.statusCode}: ${data.slice(0, 300)}`));
+        }
+        resolve(parsed !== null ? parsed : data);
+      });
+    });
+    req.setTimeout(15000, () => req.destroy(new Error('LNbits request timeout')));
+    req.on('error', reject);
+    if (payload) req.write(payload);
+    req.end();
+  });
+}
+const lnbitsGet  = (p, key) => lnbitsApi(p, key);
+const lnbitsPost = (p, key, body) => lnbitsApi(p, key, body);
+const lnbitsDel  = (p, key) => new Promise((resolve, reject) => {
+  const u = new URL(p, LNBITS_URL);
+  const req = http.request({
+    hostname: u.hostname,
+    port: u.port || 80,
+    path: u.pathname + u.search,
+    method: 'DELETE',
+    headers: { 'X-Api-Key': key },
+  }, res => {
+    let data = '';
+    res.on('data', c => data += c);
+    res.on('end', () => (res.statusCode < 400 ? resolve(true) : reject(new Error(`LNbits ${res.statusCode}: ${data.slice(0, 200)}`))));
+  });
+  req.setTimeout(15000, () => req.destroy(new Error('LNbits request timeout')));
+  req.on('error', reject);
+  req.end();
+});
+
+/** Real treasury balance of the Arena Pool wallet, in sats. */
+async function arenaWalletBalance() {
+  const w = await lnbitsGet('/api/v1/wallet', ARENA_INKEY);
+  return Math.floor(Number(w.balance || 0) / 1000); // msat → sats
+}
+
+/**
+ * Sweep the margin: if the Arena Pool holds more than the float cap,
+ * pay the excess (minus a fee reserve) into the Boutique wallet via an
+ * internal LNbits payment (instant, zero routing fee).
+ */
+async function arenaSweep() {
+  const balance = await arenaWalletBalance();
+  const excess = balance - ARENA_FLOAT_CAP - ARENA_FEE_RESERVE;
+  if (excess < 1000) return { swept: 0, balance };
+  const inv = await lnbitsPost('/api/v1/payments', ARENA_SWEEP_INKEY, {
+    out: false, amount: excess, memo: 'Lightning Arena — marge sweep', expiry: 600,
+  });
+  await lnbitsPost('/api/v1/payments', ARENA_ADMINKEY, { out: true, bolt11: inv.bolt11 });
+  return { swept: excess, balance: await arenaWalletBalance() };
+}
+
 function lndRestGet(endpoint) {
   return new Promise((resolve, reject) => {
     const [host, port] = LND_REST_HOST.split(':');
@@ -1373,15 +1461,13 @@ function arenaUpdate(mutator) {
   });
 }
 
-/** Treasury = seed + entry payments received − bounties paid (derived from sessions). */
-function arenaPool(sessions) {
-  let pool = ARENA_SEED_SATS;
-  for (const id of Object.keys(sessions)) {
-    const s = sessions[id];
-    if (s.paid) pool += ARENA_ENTRY_SATS;
-    pool -= (s.withdrawn || 0);
-  }
-  return pool;
+/**
+ * Treasury = the real balance of the Arena Pool LNbits wallet.
+ * (Derived-from-sessions math is gone: LNbits is the source of truth.)
+ */
+async function arenaPool() {
+  try { return await arenaWalletBalance(); }
+  catch { return null; }
 }
 
 function arenaSessionByToken(sessions, token) {
@@ -1425,7 +1511,7 @@ app.use((req, res, next) => {
 });
 
 /** Public economy parameters — lets the client display real numbers. */
-app.get('/api/v1/arena/health', (req, res) => {
+app.get('/api/v1/arena/health', async (req, res) => {
   res.json({
     success: true,
     data: {
@@ -1433,46 +1519,49 @@ app.get('/api/v1/arena/health', (req, res) => {
       entry_sats: ARENA_ENTRY_SATS,
       bounty_sats: ARENA_BOUNTY_SATS,
       max_frags: ARENA_MAX_FRAGS,
-      pool: arenaPool(loadJson(ARENA_SESSIONS_FILE, {})),
+      pool: await arenaPool(),
     },
   });
 });
 
-/** Create the entry invoice (BOLT11) + a session token. Public. */
+/** Create the entry invoice (BOLT11 via LNbits Arena Pool) + a session token. Public. */
 app.post('/api/v1/arena/join', arenaLimiter, async (req, res) => {
   try {
-    const data = await lndRestPost('/v1/invoices', {
-      value: String(ARENA_ENTRY_SATS),
+    const inv = await lnbitsPost('/api/v1/payments', ARENA_INKEY, {
+      out: false,
+      amount: ARENA_ENTRY_SATS,
       memo: 'Lightning Arena — entrée arène',
       expiry: 3600,
     });
-    if (!data.payment_request || !data.r_hash) {
-      return res.status(500).json({ success: false, error: 'LND error', message: JSON.stringify(data) });
+    if (!inv.bolt11 || !inv.payment_hash) {
+      return res.status(500).json({ success: false, error: 'LNbits error', message: JSON.stringify(inv).slice(0, 200) });
     }
+    // Trigger a margin sweep opportunistically on entry (non-blocking)
+    arenaSweep().catch(() => {});
     const sessions = await arenaUpdate(async (sessions) => {
       // clean sessions older than 24h
       const now = Date.now();
       for (const id of Object.keys(sessions)) {
         if (now - sessions[id].created > 86400000) delete sessions[id];
       }
-      sessions[data.r_hash] = {
-        invoice_hash: data.r_hash,
-        invoice_hex: Buffer.from(String(data.r_hash), 'base64').toString('hex'),
-        payment_request: data.payment_request,
+      sessions[inv.payment_hash] = {
+        invoice_hash: inv.payment_hash,
+        payment_request: inv.bolt11,
         created: now,
         paid: false,
         paidAt: null,
         frags: 0,
         withdrawn: 0,
         lastKill: 0,
+        withdrawLink: null,
       };
     });
     res.json({
       success: true,
       data: {
-        session_token: arenaHmac(data.r_hash),
-        payment_request: data.payment_request,
-        invoice_hash: data.r_hash,
+        session_token: arenaHmac(inv.payment_hash),
+        payment_request: inv.bolt11,
+        invoice_hash: inv.payment_hash,
         entry_sats: ARENA_ENTRY_SATS,
         bounty_sats: ARENA_BOUNTY_SATS,
         max_frags: ARENA_MAX_FRAGS,
@@ -1491,10 +1580,11 @@ app.get('/api/v1/arena/status/:token', arenaReadLimiter, async (req, res) => {
       if (!found) return { status: 404, body: { success: false, error: 'Session not found' } };
       const { s } = found;
       if (!s.paid) {
-        const inv = await lndRestGet('/v1/invoice/' + (s.invoice_hex || Buffer.from(s.invoice_hash, 'base64').toString('hex')));
-        if (inv && inv.settled) {
+        const inv = await lnbitsGet('/api/v1/payments/' + encodeURIComponent(s.invoice_hash), ARENA_INKEY);
+        if (inv && inv.paid) {
           s.paid = true;
           s.paidAt = Date.now();
+          arenaSweep().catch(() => {});
         }
       }
       return {
@@ -1506,7 +1596,7 @@ app.get('/api/v1/arena/status/:token', arenaReadLimiter, async (req, res) => {
             frags: s.frags,
             bounty_sats: ARENA_BOUNTY_SATS,
             credit: s.frags * ARENA_BOUNTY_SATS - (s.withdrawn || 0),
-            pool: arenaPool(sessions),
+            pool: await arenaPool(),
             entry_sats: ARENA_ENTRY_SATS,
             max_frags: ARENA_MAX_FRAGS,
           },
@@ -1535,8 +1625,8 @@ app.post('/api/v1/arena/kill', arenaLimiter, async (req, res) => {
       if (!found) return { status: 404, body: { success: false, error: 'Session not found' } };
       const { s } = found;
       if (!s.paid) {
-        const inv = await lndRestGet('/v1/invoice/' + (s.invoice_hex || Buffer.from(s.invoice_hash, 'base64').toString('hex')));
-        s.paid = !!(inv && inv.settled);
+        const inv = await lnbitsGet('/api/v1/payments/' + encodeURIComponent(s.invoice_hash), ARENA_INKEY);
+        s.paid = !!(inv && inv.paid);
         if (!s.paid) return { status: 402, body: { success: false, error: 'Entry not paid' } };
       }
       if (s.frags >= ARENA_MAX_FRAGS) {
@@ -1546,7 +1636,8 @@ app.post('/api/v1/arena/kill', arenaLimiter, async (req, res) => {
       if (now - (s.lastKill || 0) < 500) {
         return { status: 429, body: { success: false, error: 'Kill rate too high' } };
       }
-      if (arenaPool(sessions) < ARENA_BOUNTY_SATS) {
+      const pool = await arenaPool();
+      if (pool !== null && pool < ARENA_BOUNTY_SATS) {
         return { status: 503, body: { success: false, error: 'Bounty pool empty' } };
       }
       s.frags += 1;
@@ -1560,7 +1651,7 @@ app.post('/api/v1/arena/kill', arenaLimiter, async (req, res) => {
             frags: s.frags,
             credit: s.frags * ARENA_BOUNTY_SATS - (s.withdrawn || 0),
             bounty_sats: ARENA_BOUNTY_SATS,
-            pool: arenaPool(sessions),
+            pool,
           },
         },
       };
@@ -1592,11 +1683,15 @@ app.get('/api/v1/arena/qr/:token', arenaReadLimiter, async (req, res) => {
   }
 });
 
-/** Withdraw credit by paying the player's BOLT11 invoice. Public but token-gated + capped. */
+/**
+ * Withdraw credit as an LNURL-withdraw link (LNbits withdraw extension).
+ * The player scans the LNURL with their wallet; LNbits pays the claim.
+ * One active link per session, idempotent; link deleted on claim/TTL.
+ */
 app.post('/api/v1/arena/withdraw', arenaLimiter, async (req, res) => {
-  const { session_token, payment_request } = req.body || {};
-  if (!session_token || !payment_request || typeof payment_request !== 'string' || !payment_request.startsWith('lnbc')) {
-    return res.status(400).json({ success: false, error: 'session_token + BOLT11 payment_request required' });
+  const { session_token } = req.body || {};
+  if (!session_token || typeof session_token !== 'string') {
+    return res.status(400).json({ success: false, error: 'session_token required' });
   }
   try {
     const result = await arenaUpdate(async (sessions) => {
@@ -1604,50 +1699,143 @@ app.post('/api/v1/arena/withdraw', arenaLimiter, async (req, res) => {
       if (!found) return { status: 404, body: { success: false, error: 'Session not found' } };
       const { s } = found;
       if (!s.paid) {
-        const inv = await lndRestGet('/v1/invoice/' + (s.invoice_hex || Buffer.from(s.invoice_hash, 'base64').toString('hex')));
-        s.paid = !!(inv && inv.settled);
+        const inv = await lnbitsGet('/api/v1/payments/' + encodeURIComponent(s.invoice_hash), ARENA_INKEY);
+        s.paid = !!(inv && inv.paid);
         if (!s.paid) return { status: 402, body: { success: false, error: 'Entry not paid' } };
       }
       const credit = s.frags * ARENA_BOUNTY_SATS - (s.withdrawn || 0);
       if (credit < ARENA_BOUNTY_SATS) {
         return { status: 400, body: { success: false, error: 'No bounty credit to withdraw' } };
       }
-      if (arenaPool(sessions) < ARENA_BOUNTY_SATS) {
+      const pool = await arenaPool();
+      if (pool !== null && pool < credit) {
         return { status: 503, body: { success: false, error: 'Bounty pool empty' } };
       }
-      // Decode the player's invoice to check its amount (never pay blind)
-      const decoded = await lndRestGet('/v1/payreq/' + encodeURIComponent(payment_request));
-      const amountSat = Number(decoded && decoded.num_satoshis);
-      if (!Number.isFinite(amountSat) || amountSat <= 0) {
-        return { status: 400, body: { success: false, error: 'Invalid withdrawal invoice' } };
+      // One active link per session (replay of the end-of-game request is idempotent)
+      if (s.withdrawLink) {
+        try {
+          const link = await lnbitsGet('/withdraw/api/v1/links/' + s.withdrawLink, ARENA_INKEY);
+          if (link && link.used >= (link.uses || 0)) {
+            // already claimed — mark withdrawn and allow a fresh link if credit remains
+            s.withdrawn = (s.withdrawn || 0) + Math.min(credit, link.max_withdrawable);
+            s.withdrawLink = null;
+          } else if (link) {
+            return {
+              status: 200,
+              body: {
+                success: true,
+                data: {
+                  lnurl: link.lnurl || (link.lnurl_url ? 'lightning:' + link.lnurl_url : null),
+                  claimed: false,
+                  credit,
+                  pool,
+                },
+              },
+            };
+          }
+        } catch { s.withdrawLink = null; }
       }
-      const payAmount = Math.min(amountSat, credit);
-      // Non-streaming SendPayment (v1 channels/transactions) — returns the
-      // final result in one JSON response, unlike the v2 streaming endpoint.
-      const sendRes = await lndRestPost('/v1/channels/transactions', {
-        payment_request,
-        fee_limit: { fixed: String(Math.max(50, Math.floor(payAmount * 0.05))) },
+      const withdrawAmount = Math.min(credit, ARENA_MAX_WITHDRAW);
+      const link = await lnbitsPost('/withdraw/api/v1/links', ARENA_ADMINKEY, {
+        title: 'Lightning Arena — retrait bounty',
+        min_withdrawable: withdrawAmount,
+        max_withdrawable: withdrawAmount,
+        uses: 1,
+        wait_time: 1,
+        is_unique: true,
       });
-      if (sendRes && (sendRes.payment_preimage || (sendRes.payment_error === ''))) {
-        s.withdrawn = (s.withdrawn || 0) + payAmount;
-        return {
-          status: 200,
-          body: {
-            success: true,
-            data: {
-              paid_sats: payAmount,
-              preimage: sendRes.payment_preimage || null,
-              remaining_credit: s.frags * ARENA_BOUNTY_SATS - s.withdrawn,
-              pool: arenaPool(sessions),
-            },
-          },
-        };
+      if (!link || !link.id) {
+        return { status: 500, body: { success: false, error: 'Withdraw link creation failed', message: JSON.stringify(link).slice(0, 200) } };
       }
-      return { status: 500, body: { success: false, error: 'Payment failed', message: (sendRes && sendRes.payment_error) || (sendRes && JSON.stringify(sendRes).slice(0, 200)) } };
+      s.withdrawLink = link.id;
+      return {
+        status: 200,
+        body: {
+          success: true,
+          data: {
+            lnurl: link.lnurl || null,
+            lnurl_url: link.lnurl_url || null,
+            claim_id: link.id,
+            amount_sats: withdrawAmount,
+            claimed: false,
+            credit,
+            pool,
+          },
+        },
+      };
     });
     res.status(result.status).json(result.body);
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * Withdraw claim status + QR of the LNURL. The client polls this; when the
+ * link is used we settle the session (withdrawn += amount) and delete the
+ * link so no stale claimable URL remains.
+ */
+app.get('/api/v1/arena/withdraw/status/:token', arenaReadLimiter, async (req, res) => {
+  try {
+    const result = await arenaUpdate(async (sessions) => {
+      const found = arenaSessionByToken(sessions, req.params.token);
+      if (!found) return { status: 404, body: { success: false, error: 'Session not found' } };
+      const { s } = found;
+      if (!s.withdrawLink) {
+        return {
+          status: 200,
+          body: {
+            success: true,
+            data: { claimed: false, credit: s.frags * ARENA_BOUNTY_SATS - (s.withdrawn || 0), pool: await arenaPool() },
+          },
+        };
+      }
+      const link = await lnbitsGet('/withdraw/api/v1/links/' + s.withdrawLink, ARENA_INKEY);
+      const claimed = !!(link && link.used >= (link.uses || 0));
+      if (claimed) {
+        s.withdrawn = (s.withdrawn || 0) + Math.min(link.max_withdrawable, s.frags * ARENA_BOUNTY_SATS - (s.withdrawn || 0));
+        lnbitsDel('/withdraw/api/v1/links/' + s.withdrawLink, ARENA_ADMINKEY).catch(() => {});
+        s.withdrawLink = null;
+      }
+      return {
+        status: 200,
+        body: {
+          success: true,
+          data: {
+            claimed,
+            credit: s.frags * ARENA_BOUNTY_SATS - (s.withdrawn || 0),
+            pool: await arenaPool(),
+          },
+        },
+      };
+    });
+    res.status(result.status).json(result.body);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/** QR of the active withdraw LNURL for this session. */
+app.get('/api/v1/arena/withdraw/qr/:token', arenaReadLimiter, async (req, res) => {
+  try {
+    const sessions = await loadArenaSessions();
+    const found = arenaSessionByToken(sessions, req.params.token);
+    if (!found || !found.s.withdrawLink) {
+      return res.status(404).json({ success: false, error: 'No active withdraw link' });
+    }
+    const link = await lnbitsGet('/withdraw/api/v1/links/' + found.s.withdrawLink, ARENA_INKEY);
+    if (!link || !link.lnurl) {
+      return res.status(404).json({ success: false, error: 'Withdraw link not found' });
+    }
+    const size = Math.min(Math.max(parseInt(req.query.size) || 320, 160), 1000);
+    const buf = await QRCode.toBuffer(link.lnurl.toUpperCase(), {
+      type: 'png', width: size, margin: 2, errorCorrectionLevel: 'M',
+    });
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'private, max-age=30');
+    res.send(buf);
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'QR generation failed' });
   }
 });
 
