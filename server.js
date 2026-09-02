@@ -1320,6 +1320,285 @@ const server = app.listen(PORT, () => {
 });
 
 // ============================================
+// LIGHTNING ARENA — GAME ECONOMY (public endpoints)
+// ============================================
+// These endpoints are CALLED FROM THE BROWSER (game client) so they cannot
+// require the API key. Protection instead: HMAC session token, strict rate
+// limits, per-session caps, and the treasury pool that bounds total outflow.
+// Economy: entry invoice pays INTO the treasury; kills credit bounty OUT of
+// the treasury (2 100 sats each, capped per session). The node never pays
+// more than the pool holds. All state in data/arena_sessions.json (atomic).
+
+const ARENA_SESSIONS_FILE = path.join(DATA_DIR, 'arena_sessions.json');
+const ARENA_SECRET_FILE  = path.join(DATA_DIR, 'arena_secret.txt');
+if (!fs.existsSync(ARENA_SESSIONS_FILE)) fs.writeFileSync(ARENA_SESSIONS_FILE, '{}');
+let ARENA_SECRET = process.env.ARENA_SECRET;
+if (!ARENA_SECRET) {
+  if (fs.existsSync(ARENA_SECRET_FILE)) {
+    ARENA_SECRET = fs.readFileSync(ARENA_SECRET_FILE, 'utf8').trim();
+  } else {
+    ARENA_SECRET = crypto.randomBytes(32).toString('hex');
+    fs.writeFileSync(ARENA_SECRET_FILE, ARENA_SECRET, { mode: 0o600 });
+  }
+}
+
+const ARENA_ENTRY_SATS   = Number(process.env.ARENA_ENTRY_SATS   || 1000);
+const ARENA_BOUNTY_SATS  = Number(process.env.ARENA_BOUNTY_SATS  || 2100);
+const ARENA_MAX_FRAGS    = Number(process.env.ARENA_MAX_FRAGS    || 20);  // frag limit of a match
+const ARENA_MAX_WITHDRAW = Number(process.env.ARENA_MAX_WITHDRAW || ARENA_MAX_FRAGS * ARENA_BOUNTY_SATS);
+
+function arenaHmac(data) {
+  return crypto.createHmac('sha256', ARENA_SECRET).update(data).digest('hex');
+}
+function loadArenaSessions() { return loadJsonAsync(ARENA_SESSIONS_FILE, {}); }
+function saveArenaSessions(s) { return saveJsonAsync(ARENA_SESSIONS_FILE, s); }
+
+/**
+ * Atomic load-modify-save under the file mutex: prevents two concurrent
+ * requests (e.g. two kills in the same frame) from overwriting each other.
+ */
+function arenaUpdate(mutator) {
+  return getFileMutex(ARENA_SESSIONS_FILE).runExclusive(async () => {
+    const sessions = loadJson(ARENA_SESSIONS_FILE, {});
+    const result = await mutator(sessions);
+    saveJson(ARENA_SESSIONS_FILE, sessions);
+    return result;
+  });
+}
+
+/** Treasury = entry payments received − bounties paid (derived from sessions). */
+function arenaPool(sessions) {
+  let pool = 0;
+  for (const id of Object.keys(sessions)) {
+    const s = sessions[id];
+    if (s.paid) pool += ARENA_ENTRY_SATS;
+    pool -= (s.withdrawn || 0);
+  }
+  return pool;
+}
+
+function arenaSessionByToken(sessions, token) {
+  for (const id of Object.keys(sessions)) {
+    const s = sessions[id];
+    const expect = arenaHmac(s.invoice_hash);
+    if (expect === token) return { id, s };
+  }
+  return null;
+}
+
+const arenaLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 20,
+  message: { success: false, error: 'Too many requests — slow down' },
+});
+
+// CORS for the game origin only (browser calls from silexperience.org)
+app.use('/api/v1/arena', (req, res, next) => {
+  const origin = req.headers.origin || '';
+  if (/^https:\/\/silexperience\.org$/.test(origin) ||
+      /^https:\/\/arena\.21pay\.org$/.test(origin) ||
+      /^http:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+)(:\d+)?$/.test(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
+
+/** Create the entry invoice (BOLT11) + a session token. Public. */
+app.post('/api/v1/arena/join', arenaLimiter, async (req, res) => {
+  try {
+    const data = await lndRestPost('/v1/invoices', {
+      value: String(ARENA_ENTRY_SATS),
+      memo: 'Lightning Arena — entrée arène',
+      expiry: 3600,
+    });
+    if (!data.payment_request || !data.r_hash) {
+      return res.status(500).json({ success: false, error: 'LND error', message: JSON.stringify(data) });
+    }
+    const sessions = await arenaUpdate(async (sessions) => {
+      // clean sessions older than 24h
+      const now = Date.now();
+      for (const id of Object.keys(sessions)) {
+        if (now - sessions[id].created > 86400000) delete sessions[id];
+      }
+      sessions[data.r_hash] = {
+        invoice_hash: data.r_hash,
+        payment_request: data.payment_request,
+        created: now,
+        paid: false,
+        paidAt: null,
+        frags: 0,
+        withdrawn: 0,
+        lastKill: 0,
+      };
+    });
+    res.json({
+      success: true,
+      data: {
+        session_token: arenaHmac(data.r_hash),
+        payment_request: data.payment_request,
+        invoice_hash: data.r_hash,
+        entry_sats: ARENA_ENTRY_SATS,
+        bounty_sats: ARENA_BOUNTY_SATS,
+        max_frags: ARENA_MAX_FRAGS,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/** Session status: entry paid? frags credited? treasury pool? Public. */
+app.get('/api/v1/arena/status/:token', arenaLimiter, async (req, res) => {
+  try {
+    const result = await arenaUpdate(async (sessions) => {
+      const found = arenaSessionByToken(sessions, req.params.token);
+      if (!found) return { status: 404, body: { success: false, error: 'Session not found' } };
+      const { s } = found;
+      if (!s.paid) {
+        const inv = await lndRestGet('/v1/invoice/' + s.invoice_hash);
+        if (inv && inv.settled) {
+          s.paid = true;
+          s.paidAt = Date.now();
+        }
+      }
+      return {
+        status: 200,
+        body: {
+          success: true,
+          data: {
+            paid: !!s.paid,
+            frags: s.frags,
+            bounty_sats: ARENA_BOUNTY_SATS,
+            credit: s.frags * ARENA_BOUNTY_SATS - (s.withdrawn || 0),
+            pool: arenaPool(sessions),
+            entry_sats: ARENA_ENTRY_SATS,
+            max_frags: ARENA_MAX_FRAGS,
+          },
+        },
+      };
+    });
+    res.status(result.status).json(result.body);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * Report a frag. Anti-fraud: entry must be paid, frag cap per session,
+ * treasury must hold the bounty, and kills are rate-limited per session
+ * (0.5 s between claims — a real LG kill takes longer).
+ */
+app.post('/api/v1/arena/kill', arenaLimiter, async (req, res) => {
+  const { session_token, match_id } = req.body || {};
+  if (!session_token || typeof session_token !== 'string') {
+    return res.status(400).json({ success: false, error: 'session_token required' });
+  }
+  try {
+    const result = await arenaUpdate(async (sessions) => {
+      const found = arenaSessionByToken(sessions, session_token);
+      if (!found) return { status: 404, body: { success: false, error: 'Session not found' } };
+      const { s } = found;
+      if (!s.paid) {
+        const inv = await lndRestGet('/v1/invoice/' + s.invoice_hash);
+        s.paid = !!(inv && inv.settled);
+        if (!s.paid) return { status: 402, body: { success: false, error: 'Entry not paid' } };
+      }
+      if (s.frags >= ARENA_MAX_FRAGS) {
+        return { status: 429, body: { success: false, error: 'Frag cap reached', frags: s.frags } };
+      }
+      const now = Date.now();
+      if (now - (s.lastKill || 0) < 500) {
+        return { status: 429, body: { success: false, error: 'Kill rate too high' } };
+      }
+      if (arenaPool(sessions) < ARENA_BOUNTY_SATS) {
+        return { status: 503, body: { success: false, error: 'Bounty pool empty' } };
+      }
+      s.frags += 1;
+      s.lastKill = now;
+      s.lastMatch = typeof match_id === 'string' ? match_id.slice(0, 64) : (s.lastMatch || '');
+      return {
+        status: 200,
+        body: {
+          success: true,
+          data: {
+            frags: s.frags,
+            credit: s.frags * ARENA_BOUNTY_SATS - (s.withdrawn || 0),
+            bounty_sats: ARENA_BOUNTY_SATS,
+            pool: arenaPool(sessions),
+          },
+        },
+      };
+    });
+    res.status(result.status).json(result.body);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/** Withdraw credit by paying the player's BOLT11 invoice. Public but token-gated + capped. */
+app.post('/api/v1/arena/withdraw', arenaLimiter, async (req, res) => {
+  const { session_token, payment_request } = req.body || {};
+  if (!session_token || !payment_request || typeof payment_request !== 'string' || !payment_request.startsWith('lnbc')) {
+    return res.status(400).json({ success: false, error: 'session_token + BOLT11 payment_request required' });
+  }
+  try {
+    const result = await arenaUpdate(async (sessions) => {
+      const found = arenaSessionByToken(sessions, session_token);
+      if (!found) return { status: 404, body: { success: false, error: 'Session not found' } };
+      const { s } = found;
+      if (!s.paid) {
+        const inv = await lndRestGet('/v1/invoice/' + s.invoice_hash);
+        s.paid = !!(inv && inv.settled);
+        if (!s.paid) return { status: 402, body: { success: false, error: 'Entry not paid' } };
+      }
+      const credit = s.frags * ARENA_BOUNTY_SATS - (s.withdrawn || 0);
+      if (credit < ARENA_BOUNTY_SATS) {
+        return { status: 400, body: { success: false, error: 'No bounty credit to withdraw' } };
+      }
+      if (arenaPool(sessions) < ARENA_BOUNTY_SATS) {
+        return { status: 503, body: { success: false, error: 'Bounty pool empty' } };
+      }
+      // Decode the player's invoice to check its amount (never pay blind)
+      const decoded = await lndRestGet('/v1/payreq/' + encodeURIComponent(payment_request));
+      const amountSat = Number(decoded && decoded.num_satoshis);
+      if (!Number.isFinite(amountSat) || amountSat <= 0) {
+        return { status: 400, body: { success: false, error: 'Invalid withdrawal invoice' } };
+      }
+      const payAmount = Math.min(amountSat, credit);
+      // Non-streaming SendPayment (v1 channels/transactions) — returns the
+      // final result in one JSON response, unlike the v2 streaming endpoint.
+      const sendRes = await lndRestPost('/v1/channels/transactions', {
+        payment_request,
+        fee_limit: { fixed: String(Math.max(50, Math.floor(payAmount * 0.05))) },
+      });
+      if (sendRes && (sendRes.payment_preimage || (sendRes.payment_error === ''))) {
+        s.withdrawn = (s.withdrawn || 0) + payAmount;
+        return {
+          status: 200,
+          body: {
+            success: true,
+            data: {
+              paid_sats: payAmount,
+              preimage: sendRes.payment_preimage || null,
+              remaining_credit: s.frags * ARENA_BOUNTY_SATS - s.withdrawn,
+              pool: arenaPool(sessions),
+            },
+          },
+        };
+      }
+      return { status: 500, body: { success: false, error: 'Payment failed', message: (sendRes && sendRes.payment_error) || (sendRes && JSON.stringify(sendRes).slice(0, 200)) } };
+    });
+    res.status(result.status).json(result.body);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ============================================
 // GRACEFUL SHUTDOWN (Docker SIGTERM support)
 // ============================================
 function shutdown(signal) {
