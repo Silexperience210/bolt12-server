@@ -1827,7 +1827,7 @@ app.get('/api/v1/arena/withdraw/qr/:token', arenaReadLimiter, async (req, res) =
     if (!link || !link.lnurl) {
       return res.status(404).json({ success: false, error: 'Withdraw link not found' });
     }
-    const size = Math.min(Math.max(parseInt(req.query.size) || 320, 160), 1000);
+    const size = Math.min(Math.max(parseInt(req.query.size) || 480, 240), 1000);
     const buf = await QRCode.toBuffer(link.lnurl.toUpperCase(), {
       type: 'png', width: size, margin: 2, errorCorrectionLevel: 'M',
     });
