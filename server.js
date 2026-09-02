@@ -1346,6 +1346,9 @@ const ARENA_ENTRY_SATS   = Number(process.env.ARENA_ENTRY_SATS   || 1000);
 const ARENA_BOUNTY_SATS  = Number(process.env.ARENA_BOUNTY_SATS  || 2100);
 const ARENA_MAX_FRAGS    = Number(process.env.ARENA_MAX_FRAGS    || 20);  // frag limit of a match
 const ARENA_MAX_WITHDRAW = Number(process.env.ARENA_MAX_WITHDRAW || ARENA_MAX_FRAGS * ARENA_BOUNTY_SATS);
+// Seed the treasury at boot so the first players can earn bounties before
+// enough entries accumulate. Set ARENA_SEED_SATS in the container env.
+const ARENA_SEED_SATS    = Number(process.env.ARENA_SEED_SATS    || 0);
 
 function arenaHmac(data) {
   return crypto.createHmac('sha256', ARENA_SECRET).update(data).digest('hex');
@@ -1366,9 +1369,9 @@ function arenaUpdate(mutator) {
   });
 }
 
-/** Treasury = entry payments received − bounties paid (derived from sessions). */
+/** Treasury = seed + entry payments received − bounties paid (derived from sessions). */
 function arenaPool(sessions) {
-  let pool = 0;
+  let pool = ARENA_SEED_SATS;
   for (const id of Object.keys(sessions)) {
     const s = sessions[id];
     if (s.paid) pool += ARENA_ENTRY_SATS;
@@ -1393,18 +1396,34 @@ const arenaLimiter = rateLimit({
 });
 
 // CORS for the game origin only (browser calls from silexperience.org)
-app.use('/api/v1/arena', (req, res, next) => {
-  const origin = req.headers.origin || '';
-  if (/^https:\/\/silexperience\.org$/.test(origin) ||
-      /^https:\/\/arena\.21pay\.org$/.test(origin) ||
-      /^http:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+)(:\d+)?$/.test(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Vary', 'Origin');
+app.use((req, res, next) => {
+  if (req.path === '/health' || req.path.startsWith('/api/v1/arena')) {
+    const origin = req.headers.origin || '';
+    if (/^https:\/\/silexperience\.org$/.test(origin) ||
+        /^https:\/\/arena\.21pay\.org$/.test(origin) ||
+        /^http:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+)(:\d+)?$/.test(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Vary', 'Origin');
+    }
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') return res.sendStatus(204);
   }
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
+});
+
+/** Public economy parameters — lets the client display real numbers. */
+app.get('/api/v1/arena/health', (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      ok: true,
+      entry_sats: ARENA_ENTRY_SATS,
+      bounty_sats: ARENA_BOUNTY_SATS,
+      max_frags: ARENA_MAX_FRAGS,
+      pool: arenaPool(loadJson(ARENA_SESSIONS_FILE, {})),
+    },
+  });
 });
 
 /** Create the entry invoice (BOLT11) + a session token. Public. */
