@@ -1426,6 +1426,7 @@ app.post('/api/v1/arena/join', arenaLimiter, async (req, res) => {
       }
       sessions[data.r_hash] = {
         invoice_hash: data.r_hash,
+        invoice_hex: Buffer.from(String(data.r_hash), 'base64').toString('hex'),
         payment_request: data.payment_request,
         created: now,
         paid: false,
@@ -1459,7 +1460,7 @@ app.get('/api/v1/arena/status/:token', arenaLimiter, async (req, res) => {
       if (!found) return { status: 404, body: { success: false, error: 'Session not found' } };
       const { s } = found;
       if (!s.paid) {
-        const inv = await lndRestGet('/v1/invoice/' + s.invoice_hash);
+        const inv = await lndRestGet('/v1/invoice/' + (s.invoice_hex || Buffer.from(s.invoice_hash, 'base64').toString('hex')));
         if (inv && inv.settled) {
           s.paid = true;
           s.paidAt = Date.now();
@@ -1503,7 +1504,7 @@ app.post('/api/v1/arena/kill', arenaLimiter, async (req, res) => {
       if (!found) return { status: 404, body: { success: false, error: 'Session not found' } };
       const { s } = found;
       if (!s.paid) {
-        const inv = await lndRestGet('/v1/invoice/' + s.invoice_hash);
+        const inv = await lndRestGet('/v1/invoice/' + (s.invoice_hex || Buffer.from(s.invoice_hash, 'base64').toString('hex')));
         s.paid = !!(inv && inv.settled);
         if (!s.paid) return { status: 402, body: { success: false, error: 'Entry not paid' } };
       }
@@ -1572,7 +1573,7 @@ app.post('/api/v1/arena/withdraw', arenaLimiter, async (req, res) => {
       if (!found) return { status: 404, body: { success: false, error: 'Session not found' } };
       const { s } = found;
       if (!s.paid) {
-        const inv = await lndRestGet('/v1/invoice/' + s.invoice_hash);
+        const inv = await lndRestGet('/v1/invoice/' + (s.invoice_hex || Buffer.from(s.invoice_hash, 'base64').toString('hex')));
         s.paid = !!(inv && inv.settled);
         if (!s.paid) return { status: 402, body: { success: false, error: 'Entry not paid' } };
       }
